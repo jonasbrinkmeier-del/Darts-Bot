@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dart Bot</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SCREEN 1: START MENU -->
+<div id="screen-menu">
+  <div id="menu-header">
+    <div id="menu-logo">🎯</div>
+    <div id="menu-title">DART BOT</div>
+    <div id="menu-sub">choose your game</div>
+  </div>
+  <div id="menu-buttons">
+    <button class="menu-btn" onclick="showModeSetup('bot')">
+      <span class="menu-btn-title">VS BOT</span>
+      <span class="menu-btn-sub">Play against the AI</span>
+    </button>
+    <button class="menu-btn" onclick="showModeSetup('1v1')">
+      <span class="menu-btn-title">1V1 LOCAL</span>
+      <span class="menu-btn-sub">Two players, one device</span>
+    </button>
+  </div>
+</div>
+
+<!-- SCREEN 2: SETUP -->
+<div id="screen-setup" style="display:none">
+  <div id="setup-header">
+    <button id="setup-back" onclick="showMenu()">← Back</button>
+    <div id="setup-title">Game Setup</div>
+  </div>
+  <div class="setup-block">
+    <div class="setup-label">PLAYER 1</div>
+    <div class="setup-options">
+      <div class="setup-input-row">
+        <input type="text" id="input-p1" placeholder="Enter name…" maxlength="12" />
+      </div>
+      <button class="saved-btn disabled">
+        <span>Saved players</span>
+        <span class="coming-soon">Coming soon</span>
+      </button>
+    </div>
+  </div>
+  <div class="setup-block" id="setup-block-p2">
+    <div class="setup-label" id="setup-p2-label">OPPONENT</div>
+    <div class="setup-options" id="setup-p2-options"></div>
+  </div>
+  <button id="start-btn" onclick="startGame()">Start Game →</button>
+</div>
+
+<!-- SCREEN 3: GAME -->
+<div id="screen-game" style="display:none">
+
+  <!-- SCOREBOARD -->
+  <div id="scoreboard">
+    <div class="player-block" id="block-p1">
+      <div class="player-label" id="label-p1">P1</div>
+      <div class="player-score" id="score-p1">501</div>
+      <div class="player-avg">Avg: —</div>
+      <div class="player-visit">
+        <span class="visit-darts" id="visit-darts-p1"></span>
+        <span class="visit-score" id="visit-score-p1"></span>
+      </div>
+    </div>
+    <div id="vs">VS</div>
+    <div class="player-block" id="block-p2">
+      <div class="player-label" id="label-p2">P2</div>
+      <div class="player-score" id="score-p2">501</div>
+      <div class="player-avg">Avg: —</div>
+      <div class="player-visit">
+        <span class="visit-darts" id="visit-darts-p2"></span>
+        <span class="visit-score" id="visit-score-p2"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHECKOUT -->
+  <div id="checkout-bar" style="display:none">
+    <span id="checkout-label">Checkout</span>
+    <span id="checkout-text"></span>
+  </div>
+
+  <!-- TURN BAR -->
+  <div id="turn-bar">
+    <span id="turn-text">Your throw</span>
+  </div>
+
+  <!-- DART SLOTS -->
+  <div id="throw-display">
+    <div class="dart-slot" id="dart-1">—</div>
+    <div class="dart-slot" id="dart-2">—</div>
+    <div class="dart-slot" id="dart-3">—</div>
+  </div>
+
+  <!-- MULTIPLIER BUTTONS -->
+  <div id="multiplier-row">
+    <button class="mult-btn" id="btn-double" onclick="setMultiplier(2)">D</button>
+    <button class="mult-btn" id="btn-treble" onclick="setMultiplier(3)">T</button>
+    <button class="num-btn" id="btn-undo" onclick="clearEntry()">⌫</button>
+  </div>
+
+  <!-- NUMBER GRID -->
+  <div id="numgrid">
+    <button class="num-btn" onclick="enterNumber(0)">0</button>
+    <button class="num-btn" onclick="enterNumber(1)">1</button>
+    <button class="num-btn" onclick="enterNumber(2)">2</button>
+    <button class="num-btn" onclick="enterNumber(3)">3</button>
+    <button class="num-btn" onclick="enterNumber(4)">4</button>
+    <button class="num-btn" onclick="enterNumber(5)">5</button>
+    <button class="num-btn" onclick="enterNumber(6)">6</button>
+    <button class="num-btn" onclick="enterNumber(7)">7</button>
+    <button class="num-btn" onclick="enterNumber(8)">8</button>
+    <button class="num-btn" onclick="enterNumber(9)">9</button>
+    <button class="num-btn" onclick="enterNumber(10)">10</button>
+    <button class="num-btn" onclick="enterNumber(11)">11</button>
+    <button class="num-btn" onclick="enterNumber(12)">12</button>
+    <button class="num-btn" onclick="enterNumber(13)">13</button>
+    <button class="num-btn" onclick="enterNumber(14)">14</button>
+    <button class="num-btn" onclick="enterNumber(15)">15</button>
+    <button class="num-btn" onclick="enterNumber(16)">16</button>
+    <button class="num-btn" onclick="enterNumber(17)">17</button>
+    <button class="num-btn" onclick="enterNumber(18)">18</button>
+    <button class="num-btn" onclick="enterNumber(19)">19</button>
+    <button class="num-btn" onclick="enterNumber(20)">20</button>
+    <button class="num-btn num-btn-bull" onclick="enterNumber(25)">25</button>
+    <button class="num-btn num-btn-menu" onclick="confirmMenu()">⌂</button>
+  </div>
+
+  <!-- BESTÄTIGUNGS-POPUP -->
+  <div id="menu-confirm" style="display:none">
+    <div id="menu-confirm-box">
+      <div id="menu-confirm-text">Game verlassen?</div>
+      <div id="menu-confirm-buttons">
+        <button class="confirm-btn confirm-no" onclick="closeConfirm()">Nein</button>
+        <button class="confirm-btn confirm-yes" onclick="showMenu()">Ja</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SCREEN 4: GAME OVER -->
+<div id="screen-gameover" style="display:none">
+  <div id="gameover-inner">
+    <div id="gameover-trophy">🏆</div>
+    <div id="gameover-title">Winner!</div>
+    <div id="gameover-name"></div>
+    <div id="gameover-stats"></div>
+    <div id="gameover-buttons">
+      <button class="gameover-btn" onclick="undoFromGameover()">↩ Undo</button>
+      <button class="gameover-btn" onclick="showMenu()">⌂ Menü</button>
+      <button class="gameover-btn gameover-btn-stats" onclick="showStats()">📊 Stats</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
