@@ -259,6 +259,11 @@ function registerDart(number, multiplier, score, label) {
   const dart = { number, multiplier, score, label };
   game.dartScores.push(dart);
   if (number > 0) { const h = game.dartHits[game.turn]; h[label] = (h[label]||0)+1; }
+  const _rb = game.scoreAtTurnStart - game.dartScores.slice(0,-1).reduce((a,b)=>a+b.score,0);
+  if (_rb >= 2 && CHECKOUTS[_rb]) {
+    if (multiplier === 2 || label === 'Bull' || (score === 0 && _rb % 2 === 0 && _rb <= 50))
+      game.checkoutAttempts[game.turn]++;
+  }
   game.dartsThrown++;
   const slot = document.getElementById('dart-' + game.dartsThrown);
   slot.innerHTML = `<span>${label}</span><span class="slot-label">${score}</span>`;
@@ -408,7 +413,6 @@ function endTurn(bust) {
 function switchTurn(who) {
   game.turn = who;
   game.scoreAtTurnStart = game.scores[who];
-  if (game.scores[who] <= 170 && CHECKOUTS[game.scores[who]]) game.checkoutAttempts[who]++;
   document.getElementById('block-p1').classList.toggle('active', who === 0);
   document.getElementById('block-p2').classList.toggle('active', who === 1);
   const name = session.names[who];
@@ -474,7 +478,9 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   let result;
   if (zone === 'checkout') {
     const route = CHECKOUTS[remaining].filter(d => d !== null);
-    result = resolveFinishingDart(profile, route[0]);
+    const _tgt = route[0];
+    if (_tgt[0] === 'D' || _tgt === 'Bull') game.checkoutAttempts[game.turn]++;
+    result = resolveFinishingDart(profile, _tgt);
   } else if (zone === 't19') {
     result = drawFromDistribution(profile.t19Distribution);
   } else {
@@ -630,6 +636,8 @@ function undoFromGameover() {
   }
   if (game.visits[who].length > 0) game.visits[who].pop();
   game.checkoutHits[who] = Math.max(0, game.checkoutHits[who] - 1);
+  if (lastDart && (lastDart.multiplier === 2 || lastDart.label === 'Bull'))
+    game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
 
   game.scores[who] = game.scoreAtTurnStart;
   game.inputLocked = false;
@@ -685,13 +693,15 @@ function showStats() {
     const best = v.length > 0 ? Math.max(...v) : '—';
     const n = v.length;
     const pct = x => n > 0 ? Math.round(x/n*100) : 0;
-    const d60m  = pct(v.filter(s=>s<60).length);
-    const d60p  = pct(v.filter(s=>s>=60&&s<100).length);
-    const d100p = pct(v.filter(s=>s>=100&&s<140).length);
-    const d140p = pct(v.filter(s=>s>=140).length);
+    const c60m  = v.filter(s=>s<60).length;
+    const c60p  = v.filter(s=>s>=60&&s<100).length;
+    const c100p = v.filter(s=>s>=100&&s<140).length;
+    const c140p = v.filter(s=>s>=140).length;
     const co = game.checkoutAttempts[p], ch = game.checkoutHits[p];
     const coStr = co > 0 ? `${ch}/${co} (${Math.round(ch/co*100)}%)` : '—';
-    return { avg, first9avg, best, d60m, d60p, d100p, d140p, coStr };
+    return { avg, first9avg, best,
+      c60m, p60m:pct(c60m), c60p, p60p:pct(c60p),
+      c100p, p100p:pct(c100p), c140p, p140p:pct(c140p), coStr };
   });
   const [s0,s1] = stats;
   document.getElementById('stats-content').innerHTML = `
@@ -706,10 +716,10 @@ function showStats() {
     </div>
     <div class="stats-section-label">SCORE DISTRIBUTION</div>
     <div class="stats-grid">
-      <div class="sv">${s0.d60m}%</div><div class="sk">60−</div><div class="sv">${s1.d60m}%</div>
-      <div class="sv">${s0.d60p}%</div><div class="sk">60+</div><div class="sv">${s1.d60p}%</div>
-      <div class="sv">${s0.d100p}%</div><div class="sk">100+</div><div class="sv">${s1.d100p}%</div>
-      <div class="sv gold">${s0.d140p}%</div><div class="sk">140+</div><div class="sv gold">${s1.d140p}%</div>
+      <div class="sv-d">${s0.c60m}x / ${s0.p60m}%</div><div class="sk">60−</div><div class="sv-d">${s1.c60m}x / ${s1.p60m}%</div>
+      <div class="sv-d">${s0.c60p}x / ${s0.p60p}%</div><div class="sk">60+</div><div class="sv-d">${s1.c60p}x / ${s1.p60p}%</div>
+      <div class="sv-d">${s0.c100p}x / ${s0.p100p}%</div><div class="sk">100+</div><div class="sv-d">${s1.c100p}x / ${s1.p100p}%</div>
+      <div class="sv-d gold">${s0.c140p}x / ${s0.p140p}%</div><div class="sk">140+</div><div class="sv-d gold">${s1.c140p}x / ${s1.p140p}%</div>
     </div>
     <div class="stats-section-label">CHECKOUT</div>
     <div class="stats-grid">

@@ -206,7 +206,7 @@ body {
 .gameover-btn-stats { border-color:#4a7a4a; color:#7ec87e; }
 
 /* ── STATS ── */
-#screen-stats { overflow-y:auto; flex-direction:column; align-items:stretch; }
+#screen-stats { overflow-y:auto; max-height:100vh; flex-direction:column; align-items:stretch; }
 #stats-header {
   display:flex; align-items:center; gap:1rem;
   padding:1rem 1.25rem; border-bottom:1px solid #2a2a2a; background:#111;
@@ -244,17 +244,25 @@ body {
   color:#f0ece0; text-align:center;
 }
 .sv.gold { color:#c8a84b; }
+.sv-d {
+  font-family:'Bebas Neue',sans-serif; font-size:14px;
+  color:#f0ece0; text-align:center; letter-spacing:.04em;
+}
+.sv-d.gold { color:#c8a84b; }
 .sk {
   font-size:9px; letter-spacing:.1em; color:#444; text-transform:uppercase;
   text-align:center; display:flex; align-items:center; justify-content:center;
   border-left:1px solid #222; border-right:1px solid #222;
 }
 .stats-heatmaps {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:4px; padding:.75rem .75rem 1rem;
+  display:flex; flex-wrap:wrap;
+  gap:8px; padding:.75rem .75rem 1rem;
   background:#1a1a1a; border-top:1px solid #2a2a2a;
 }
-.stats-heatmap { display:flex; flex-direction:column; align-items:center; }
+.stats-heatmap {
+  flex:1 1 280px; min-width:280px;
+  display:flex; flex-direction:column; align-items:center;
+}
 .stats-heatmap-name {
   font-size:9px; letter-spacing:.1em; color:#555; text-transform:uppercase;
   margin-bottom:4px; text-align:center;
