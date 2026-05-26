@@ -476,6 +476,7 @@ function botThrowSequence() {
 }
 
 function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
+  const currentGameId = gameId;
   if (dartIndex >= 3) return;
   const scoredSoFar = game.dartScores.reduce((a,b) => a+b.score, 0);
   const remaining = game.scoreAtTurnStart - scoredSoFar;
@@ -511,7 +512,6 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   }
   const scoreId = game.turn === 0 ? 'score-p1' : 'score-p2';
   document.getElementById(scoreId).textContent = Math.max(0, newRemaining);
-  const currentGameId = gameId;
   if (newRemaining === 0) { setTimeout(() => { if (currentGameId !== gameId) return; endTurn(false); }, 600); return; }
   if (dartIndex + 1 >= 3) { setTimeout(() => { if (currentGameId !== gameId) return; endTurn(false); }, 600); return; }
   const isCheckout = newRemaining <= 170 && CHECKOUTS[newRemaining] &&
