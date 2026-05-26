@@ -49,6 +49,30 @@
     <div class="setup-label" id="setup-p2-label">OPPONENT</div>
     <div class="setup-options" id="setup-p2-options"></div>
   </div>
+  <div class="setup-block" id="setup-block-format">
+    <div class="setup-label">MATCH FORMAT</div>
+    <div class="format-section">
+      <div class="format-cat-label">FIRST TO</div>
+      <div class="format-group">
+        <button class="format-btn active" data-type="firstTo" data-value="1" onclick="setFormat('firstTo',1)">1</button>
+        <button class="format-btn" data-type="firstTo" data-value="2" onclick="setFormat('firstTo',2)">2</button>
+        <button class="format-btn" data-type="firstTo" data-value="3" onclick="setFormat('firstTo',3)">3</button>
+        <button class="format-btn" data-type="firstTo" data-value="4" onclick="setFormat('firstTo',4)">4</button>
+        <button class="format-btn" data-type="firstTo" data-value="5" onclick="setFormat('firstTo',5)">5</button>
+        <button class="format-btn" data-type="firstTo" data-value="6" onclick="setFormat('firstTo',6)">6</button>
+        <button class="format-btn" data-type="firstTo" data-value="10" onclick="setFormat('firstTo',10)">10</button>
+      </div>
+    </div>
+    <div class="format-section">
+      <div class="format-cat-label">BEST OF</div>
+      <div class="format-group">
+        <button class="format-btn" data-type="bestOf" data-value="3" onclick="setFormat('bestOf',3)">3</button>
+        <button class="format-btn" data-type="bestOf" data-value="5" onclick="setFormat('bestOf',5)">5</button>
+        <button class="format-btn" data-type="bestOf" data-value="9" onclick="setFormat('bestOf',9)">9</button>
+        <button class="format-btn" data-type="bestOf" data-value="11" onclick="setFormat('bestOf',11)">11</button>
+      </div>
+    </div>
+  </div>
   <button id="start-btn" onclick="startGame()">Start Game →</button>
 </div>
 
@@ -59,6 +83,7 @@
   <div id="scoreboard">
     <div class="player-block" id="block-p1">
       <div class="player-label" id="label-p1">P1</div>
+      <div class="leg-circles" id="leg-circles-p1"></div>
       <div class="player-score" id="score-p1">501</div>
       <div class="player-avg">Avg: —</div>
       <div class="player-visit">
@@ -69,6 +94,7 @@
     <div id="vs">VS</div>
     <div class="player-block" id="block-p2">
       <div class="player-label" id="label-p2">P2</div>
+      <div class="leg-circles" id="leg-circles-p2"></div>
       <div class="player-score" id="score-p2">501</div>
       <div class="player-avg">Avg: —</div>
       <div class="player-visit">

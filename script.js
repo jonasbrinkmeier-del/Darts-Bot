@@ -68,9 +68,9 @@ const BOT_PROFILES = {
   'Club Player': {
     targetAvg: 70,
     doublePhases: {
-      cold:   { accuracy:0.15, weight:0.25 },
-      normal: { accuracy:0.32, weight:0.50 },
-      hot:    { accuracy:0.52, weight:0.25 }
+      cold:   { accuracy:0.14, weight:0.25 },
+      normal: { accuracy:0.33, weight:0.50 },
+      hot:    { accuracy:0.54, weight:0.25 }
     },
     phaseTransitions: {
       cold:   { hit:{cold:0.30,normal:0.55,hot:0.15}, miss:{cold:0.55,normal:0.38,hot:0.07} },
@@ -78,24 +78,24 @@ const BOT_PROFILES = {
       hot:    { hit:{cold:0.05,normal:0.30,hot:0.65}, miss:{cold:0.20,normal:0.45,hot:0.35} }
     },
     t20Distribution: [
-      { label:'T20', number:20, multiplier:3, score:60, prob:0.38 },
-      { label:'S20', number:20, multiplier:1, score:20, prob:0.24 },
-      { label:'T5',  number:5,  multiplier:3, score:15, prob:0.11 },
-      { label:'T1',  number:1,  multiplier:3, score:3,  prob:0.09 },
+      { label:'T20', number:20, multiplier:3, score:60, prob:0.45 },
+      { label:'S20', number:20, multiplier:1, score:20, prob:0.22 },
+      { label:'T5',  number:5,  multiplier:3, score:15, prob:0.12 },
+      { label:'T1',  number:1,  multiplier:3, score:3,  prob:0.06 },
       { label:'S5',  number:5,  multiplier:1, score:5,  prob:0.07 },
-      { label:'S1',  number:1,  multiplier:1, score:1,  prob:0.06 },
+      { label:'S1',  number:1,  multiplier:1, score:1,  prob:0.04 },
       { label:'D20', number:20, multiplier:2, score:40, prob:0.03 },
-      { label:'Miss',number:0,  multiplier:0, score:0,  prob:0.02 }
+      { label:'Miss',number:0,  multiplier:0, score:0,  prob:0.01 }
     ],
     t19Distribution: [
-      { label:'T19', number:19, multiplier:3, score:57, prob:0.38 },
-      { label:'S19', number:19, multiplier:1, score:19, prob:0.24 },
-      { label:'T7',  number:7,  multiplier:3, score:21, prob:0.11 },
-      { label:'T3',  number:3,  multiplier:3, score:9,  prob:0.09 },
+      { label:'T19', number:19, multiplier:3, score:57, prob:0.45 },
+      { label:'S19', number:19, multiplier:1, score:19, prob:0.22 },
+      { label:'T7',  number:7,  multiplier:3, score:21, prob:0.12 },
+      { label:'T3',  number:3,  multiplier:3, score:9,  prob:0.06 },
       { label:'S7',  number:7,  multiplier:1, score:7,  prob:0.07 },
-      { label:'S3',  number:3,  multiplier:1, score:3,  prob:0.06 },
+      { label:'S3',  number:3,  multiplier:1, score:3,  prob:0.04 },
       { label:'D19', number:19, multiplier:2, score:38, prob:0.03 },
-      { label:'Miss',number:0,  multiplier:0, score:0,  prob:0.02 }
+      { label:'Miss',number:0,  multiplier:0, score:0,  prob:0.01 }
     ]
   }
 };
@@ -108,7 +108,11 @@ const ADJACENT = {
 };
 
 // ── SESSION ───────────────────────────────────────────────
-let session = { mode:null, names:['',''], isBot:[false,false] };
+let session = {
+  mode:null, names:['',''], isBot:[false,false],
+  format:'firstTo', formatValue:1, legsToWin:1,
+  legsWon:[0,0], legStartPlayer:0
+};
 
 // ── BOT STATE ─────────────────────────────────────────────
 let botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
@@ -138,11 +142,37 @@ function showMenu() {
   document.getElementById('screen-stats').style.display = 'none';
 }
 
+// ── FORMAT SELECTION ─────────────────────────────────────
+function setFormat(type, value) {
+  session.format = type;
+  session.formatValue = value;
+  document.querySelectorAll('.format-btn').forEach(btn => btn.classList.remove('active'));
+  const btn = document.querySelector(`.format-btn[data-type="${type}"][data-value="${value}"]`);
+  if (btn) btn.classList.add('active');
+}
+
+// ── LEG CIRCLES ──────────────────────────────────────────
+function updateLegCircles() {
+  [0,1].forEach(p => {
+    const el = document.getElementById('leg-circles-p' + (p+1));
+    if (!el) return;
+    if (session.legsToWin <= 1) { el.innerHTML = ''; return; }
+    let html = '';
+    for (let i = 0; i < session.legsToWin; i++) {
+      html += `<span class="leg-dot${i < session.legsWon[p] ? ' won' : ''}"></span>`;
+    }
+    el.innerHTML = html;
+  });
+}
+
 // ── SCREENS ───────────────────────────────────────────────
 function showModeSetup(mode) {
   session.mode = mode;
   document.getElementById('screen-menu').style.display = 'none';
   document.getElementById('screen-setup').style.display = 'flex';
+  document.querySelectorAll('.format-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.querySelector(`.format-btn[data-type="${session.format}"][data-value="${session.formatValue}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
   const p2label = document.getElementById('setup-p2-label');
   const p2options = document.getElementById('setup-p2-options');
   if (mode === 'bot') {
@@ -170,7 +200,6 @@ function showModeSetup(mode) {
 }
 
 function startGame() {
-  gameId++; // Neues Spiel = neue ID
   const p1name = document.getElementById('input-p1').value.trim() || 'Player 1';
   let p2name;
   if (session.mode === 'bot') {
@@ -179,9 +208,17 @@ function startGame() {
     p2name = (document.getElementById('input-p2')?.value.trim()) || 'Player 2';
     session.isBot = [false,false];
   }
-  session.names = [p1name,p2name];
+  session.names = [p1name, p2name];
+  session.legsToWin = session.format === 'firstTo'
+    ? session.formatValue
+    : Math.ceil(session.formatValue / 2);
+  session.legsWon = [0, 0];
+
   document.getElementById('label-p1').textContent = p1name;
   document.getElementById('label-p2').textContent = p2name;
+  document.getElementById('block-p1').querySelector('.player-avg').textContent = 'Avg: —';
+  document.getElementById('block-p2').querySelector('.player-avg').textContent = 'Avg: —';
+
   game = {
     scores:[501,501], turn:0, dartsThrown:0, dartScores:[],
     totalThrows:[0,0], totalScored:[0,0],
@@ -192,28 +229,37 @@ function startGame() {
     checkoutHits:[0,0],
     dartHits:[{},{}]
   };
+
+  updateLegCircles();
+
+  document.getElementById('screen-setup').style.display = 'none';
+  document.getElementById('screen-game').style.display = 'flex';
+
+  startLeg(0);
+}
+
+function startLeg(startPlayer) {
+  gameId++;
+  session.legStartPlayer = startPlayer;
+
+  game.scores = [501, 501];
+  game.inputLocked = false;
+
   botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
+
   document.getElementById('score-p1').textContent = '501';
   document.getElementById('score-p2').textContent = '501';
-  document.getElementById('block-p1').querySelector('.player-avg').textContent = 'Avg: —';
-  document.getElementById('block-p2').querySelector('.player-avg').textContent = 'Avg: —';
   ['p1','p2'].forEach(p => {
     const d = document.getElementById('visit-darts-' + p);
     const s = document.getElementById('visit-score-' + p);
     if (d) d.textContent = '';
     if (s) s.textContent = '';
   });
-  ['dart-1','dart-2','dart-3'].forEach(id => {
-    const el = document.getElementById(id);
-    el.innerHTML = '—';
-    el.classList.remove('filled','active-slot');
-    el.style.borderColor = '';
-    el.style.color = '';
-  });
-  document.getElementById('screen-setup').style.display = 'none';
-  document.getElementById('screen-game').style.display = 'flex';
-  resetMultiplierUI();
-  switchTurn(0);
+  document.getElementById('turn-bar').style.background = '';
+  document.getElementById('turn-bar').style.color = '';
+
+  resetTurn();
+  switchTurn(startPlayer);
 }
 
 // ── MULTIPLIER BUTTONS ────────────────────────────────────
@@ -477,6 +523,25 @@ function botThrowSequence() {
 
 function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   const currentGameId = gameId;
+
+  // Rubber band: subtle avg-based nudge on scoring distributions (never touches BOT_PROFILES)
+  let t20Dist = profile.t20Distribution;
+  let t19Dist = profile.t19Distribution;
+  if (game.totalThrows[game.turn] > 9) {
+    const currentAvg = (game.totalScored[game.turn] / game.totalThrows[game.turn]) * 3;
+    const rawAdj = currentAvg > 82 ? -0.04 : currentAvg < 56 ? 0.04 : 0;
+    if (rawAdj !== 0) {
+      const adj = Math.sign(rawAdj) * Math.min(Math.abs(rawAdj), 0.06);
+      const nudge = (dist, heroLabel) => dist.map(e => {
+        if (e.label === heroLabel) return { ...e, prob: Math.max(0, e.prob + adj) };
+        if (e.label === 'Miss')    return { ...e, prob: Math.max(0, e.prob - adj) };
+        return e;
+      });
+      t20Dist = nudge(profile.t20Distribution, 'T20');
+      t19Dist = nudge(profile.t19Distribution, 'T19');
+    }
+  }
+
   if (dartIndex >= 3) return;
   const scoredSoFar = game.dartScores.reduce((a,b) => a+b.score, 0);
   const remaining = game.scoreAtTurnStart - scoredSoFar;
@@ -490,9 +555,9 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
     if (_tgt[0] === 'D' || _tgt === 'Bull') game.checkoutAttempts[game.turn]++;
     result = resolveFinishingDart(profile, _tgt);
   } else if (zone === 't19') {
-    result = drawFromDistribution(profile.t19Distribution);
+    result = drawFromDistribution(t19Dist);
   } else {
-    result = drawFromDistribution(profile.t20Distribution);
+    result = drawFromDistribution(t20Dist);
   }
   game.dartScores.push(result);
   if (result.number > 0) { const h = game.dartHits[game.turn]; h[result.label] = (h[result.label]||0)+1; }
@@ -612,14 +677,31 @@ function updateAvg(who) {
 
 // ── GAME OVER ─────────────────────────────────────────────
 function endGame(who) {
-  const avg = game.totalThrows[who] > 0
-    ? (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1)
-    : '—';
-  document.getElementById('gameover-name').textContent = session.names[who];
-  document.getElementById('gameover-stats').innerHTML =
-    'Average: ' + avg + '<br>Darts thrown: ' + game.totalThrows[who];
-  document.getElementById('screen-game').style.display = 'none';
-  document.getElementById('screen-gameover').style.display = 'flex';
+  session.legsWon[who]++;
+  updateLegCircles();
+
+  if (session.legsWon[who] >= session.legsToWin) {
+    const avg = game.totalThrows[who] > 0
+      ? (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1) : '—';
+    document.getElementById('gameover-name').textContent = session.names[who];
+    const matchLine = session.legsToWin > 1
+      ? `${session.legsWon[0]} – ${session.legsWon[1]}<br>` : '';
+    document.getElementById('gameover-stats').innerHTML =
+      matchLine + 'Average: ' + avg + '<br>Darts thrown: ' + game.totalThrows[who];
+    document.getElementById('screen-game').style.display = 'none';
+    document.getElementById('screen-gameover').style.display = 'flex';
+  } else {
+    const capturedId = gameId;
+    const nextStarter = 1 - session.legStartPlayer;
+    document.getElementById('turn-text').textContent =
+      session.names[who] + ' wins! ' + session.legsWon[0] + '–' + session.legsWon[1];
+    document.getElementById('turn-bar').style.background = '#1a3a1a';
+    document.getElementById('turn-bar').style.color = '#7ec87e';
+    setTimeout(() => {
+      if (capturedId !== gameId) return;
+      startLeg(nextStarter);
+    }, 1800);
+  }
 }
 
 // ── UNDO VOM GAME OVER ────────────────────────────────────
@@ -649,6 +731,8 @@ function undoFromGameover() {
   }
   if (game.visits[who].length > 0) game.visits[who].pop();
   game.checkoutHits[who] = Math.max(0, game.checkoutHits[who] - 1);
+  session.legsWon[who] = Math.max(0, session.legsWon[who] - 1);
+  updateLegCircles();
   if (lastDart && (lastDart.multiplier === 2 || lastDart.label === 'Bull'))
     game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
 

@@ -72,6 +72,25 @@ body {
 }
 #start-btn:active { background:#b8943a; transform:scale(0.98); }
 
+/* ── FORMAT BUTTONS ── */
+.format-section { margin-bottom:.75rem; }
+.format-section:last-child { margin-bottom:0; }
+.format-cat-label { font-size:9px; letter-spacing:.2em; color:#555; margin-bottom:.4rem; text-transform:uppercase; }
+.format-group { display:flex; gap:6px; flex-wrap:wrap; }
+.format-btn {
+  background:#111; border:1px solid #2e2e2e; border-radius:5px;
+  color:#666; font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600;
+  padding:.4rem .65rem; cursor:pointer; touch-action:manipulation;
+  transition:all .1s; min-width:36px; text-align:center;
+}
+.format-btn:active { transform:scale(0.93); }
+.format-btn.active { background:#2a2010; border-color:#c8a84b; color:#c8a84b; }
+
+/* ── LEG CIRCLES ── */
+.leg-circles { display:flex; gap:4px; justify-content:center; margin-top:3px; min-height:14px; }
+.leg-dot { width:8px; height:8px; border-radius:50%; border:1px solid #444; background:transparent; flex-shrink:0; display:inline-block; }
+.leg-dot.won { background:#c8a84b; border-color:#c8a84b; }
+
 /* ── GAME ── */
 #scoreboard {
   display:flex; align-items:center; justify-content:space-between;
