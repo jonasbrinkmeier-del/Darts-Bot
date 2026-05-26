@@ -115,6 +115,10 @@ let session = {
   multiNumPlayers:2
 };
 
+function isMultiLayout() {
+  return session.mode === 'local' && session.multiNumPlayers > 2;
+}
+
 // ── BOT STATE ─────────────────────────────────────────────
 let botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
 
@@ -176,7 +180,7 @@ function updateLiveAvg(who) {
   const totalT = game.totalThrows[who] + game.dartsThrown;
   if (totalT === 0) return;
   const avg = ((game.totalScored[who] + scoredSoFar) / totalT * 3).toFixed(1);
-  if (session.mode === 'multi') {
+  if (isMultiLayout()) {
     const el = document.querySelector('#mp-active .player-avg');
     if (el) el.textContent = 'Avg: ' + avg;
     return;
@@ -217,7 +221,7 @@ function undoLastDart() {
 // ── STARTER SELECTION ─────────────────────────────────────
 function setStarter(player) {
   session.startingPlayer = player;
-  const n = session.mode === 'multi' ? session.multiNumPlayers : 2;
+  const n = session.mode === 'local' ? session.multiNumPlayers : 2;
   for (let i = 0; i < n; i++) {
     const btn = document.getElementById('starter-btn-' + i);
     if (btn) btn.classList.toggle('active', i === player);
@@ -225,7 +229,7 @@ function setStarter(player) {
 }
 
 function updateStarterButtons() {
-  if (session.mode === 'multi') {
+  if (session.mode === 'local') {
     const n = session.multiNumPlayers;
     for (let i = 0; i < n; i++) {
       const btn = document.getElementById('starter-btn-' + i);
@@ -237,12 +241,8 @@ function updateStarterButtons() {
     return;
   }
   const p1 = document.getElementById('input-p1').value.trim() || 'Player 1';
-  const p2Input = document.getElementById('input-p2');
-  const p2 = session.mode === 'bot'
-    ? 'Club Player'
-    : (p2Input ? p2Input.value.trim() || 'Player 2' : 'Player 2');
   document.getElementById('starter-btn-0').textContent = p1;
-  document.getElementById('starter-btn-1').textContent = p2;
+  document.getElementById('starter-btn-1').textContent = 'Club Player';
 }
 
 function rebuildStarterButtons(n) {
@@ -290,7 +290,7 @@ function setFormat(type, value) {
 
 // ── LEG CIRCLES ──────────────────────────────────────────
 function updateLegCircles() {
-  if (session.mode === 'multi') { renderMultiScoreboard(); return; }
+  if (isMultiLayout()) { renderMultiScoreboard(); return; }
   [0,1].forEach(p => {
     const el = document.getElementById('leg-circles-p' + (p+1));
     if (!el) return;
@@ -316,56 +316,40 @@ function showModeSetup(mode) {
   const multiCountBlock = document.getElementById('setup-block-multi-count');
   const multiNamesBlock = document.getElementById('setup-block-multi-names');
 
-  if (mode === 'multi') {
+  if (mode === 'local') {
     p2block.style.display = 'none';
     multiCountBlock.style.display = '';
     multiNamesBlock.style.display = '';
     session.startingPlayer = 0;
     setPlayerCount(session.multiNumPlayers);
   } else {
+    // bot mode
     p2block.style.display = '';
     multiCountBlock.style.display = 'none';
     multiNamesBlock.style.display = 'none';
     const p2label = document.getElementById('setup-p2-label');
     const p2options = document.getElementById('setup-p2-options');
-    if (mode === 'bot') {
-      p2label.textContent = 'OPPONENT (BOT)';
-      p2options.innerHTML = `
-        <div class="bot-profile-box">
-          <span class="bot-profile-name">Club Player</span>
-          <span class="bot-profile-avg">~70 avg</span>
-        </div>
-        <button class="saved-btn disabled">
-          <span>More bot profiles</span>
-          <span class="coming-soon">Coming soon</span>
-        </button>`;
-    } else {
-      p2label.textContent = 'PLAYER 2';
-      p2options.innerHTML = `
-        <div class="setup-input-row">
-          <input type="text" id="input-p2" placeholder="Enter name…" maxlength="12" oninput="updateStarterButtons()" />
-        </div>
-        <button class="saved-btn disabled">
-          <span>Saved players</span>
-          <span class="coming-soon">Coming soon</span>
-        </button>`;
-    }
+    p2label.textContent = 'OPPONENT (BOT)';
+    p2options.innerHTML = `
+      <div class="bot-profile-box">
+        <span class="bot-profile-name">Club Player</span>
+        <span class="bot-profile-avg">~70 avg</span>
+      </div>
+      <button class="saved-btn disabled">
+        <span>More bot profiles</span>
+        <span class="coming-soon">Coming soon</span>
+      </button>`;
     setStarter(0);
     updateStarterButtons();
   }
 }
 
 function startGame() {
-  if (session.mode === 'multi') { startGameMulti(); return; }
+  if (session.mode !== 'bot') { startGameLocal(); return; }
 
   const p1name = document.getElementById('input-p1').value.trim() || 'Player 1';
-  let p2name;
-  if (session.mode === 'bot') {
-    p2name = 'Club Player'; session.isBot = [false,true];
-  } else {
-    p2name = (document.getElementById('input-p2')?.value.trim()) || 'Player 2';
-    session.isBot = [false,false];
-  }
+  const p2name = 'Club Player';
+  session.isBot = [false,true];
   session.names = [p1name, p2name];
   session.legsToWin = session.format === 'firstTo'
     ? session.formatValue
@@ -407,7 +391,7 @@ function startGame() {
   startLeg(session.startingPlayer);
 }
 
-function startGameMulti() {
+function startGameLocal() {
   const n = session.multiNumPlayers;
   const names = [document.getElementById('input-p1').value.trim() || 'Player 1'];
   for (let i = 2; i <= n; i++) {
@@ -437,8 +421,19 @@ function startGameMulti() {
     lastVisitLabels: {}, lastVisitTotals: {}
   };
 
-  document.getElementById('scoreboard').style.display = 'none';
-  document.getElementById('scoreboard-multi').style.display = '';
+  if (n === 2) {
+    document.getElementById('label-p1').textContent = names[0];
+    document.getElementById('label-p2').textContent = names[1];
+    document.getElementById('block-p1').querySelector('.player-avg').textContent = 'Avg: —';
+    document.getElementById('block-p2').querySelector('.player-avg').textContent = 'Avg: —';
+    document.getElementById('scoreboard').style.display = '';
+    document.getElementById('scoreboard-multi').style.display = 'none';
+  } else {
+    document.getElementById('scoreboard').style.display = 'none';
+    document.getElementById('scoreboard-multi').style.display = '';
+  }
+
+  updateLegCircles();
 
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
@@ -468,7 +463,7 @@ function startLeg(startPlayer) {
   visitHistory = [];
   botVisitRestored = false;
 
-  if (session.mode !== 'multi') {
+  if (!isMultiLayout()) {
     document.getElementById('score-p1').textContent = '501';
     document.getElementById('score-p2').textContent = '501';
     ['p1','p2'].forEach(p => {
@@ -625,7 +620,7 @@ function undoLastVisit() {
   const isBot = session.isBot[who] || false;
 
   // Score-Anzeige + Turn-Indikatoren
-  if (session.mode === 'multi') {
+  if (isMultiLayout()) {
     if (game.lastVisitLabels) game.lastVisitLabels[who] = '';
     if (game.lastVisitTotals) delete game.lastVisitTotals[who];
     renderMultiScoreboard();
@@ -669,7 +664,7 @@ function undoLastVisit() {
   });
 
   // Last-Visit-Anzeige leeren (nur für 1v1/bot)
-  if (session.mode !== 'multi') {
+  if (!isMultiLayout()) {
     const dartsEl = document.getElementById('visit-darts-p' + (who + 1));
     const scoreEl = document.getElementById('visit-score-p' + (who + 1));
     if (dartsEl) dartsEl.textContent = '';
@@ -721,7 +716,7 @@ function clearEntry() {
 function updateLiveScore() {
   const scored = game.dartScores.reduce((a,b) => a+b.score, 0);
   const remaining = game.scoreAtTurnStart - scored;
-  if (session.mode === 'multi') {
+  if (isMultiLayout()) {
     const el = document.getElementById('mp-active-score');
     if (el) el.textContent = Math.max(0, remaining);
     return;
@@ -754,7 +749,7 @@ function updateCheckout() {
 function updateLastVisit(who, darts) {
   const total = darts.reduce((a,b) => a+b.score, 0);
   const labels = darts.map(d => d.label).join('·');
-  if (session.mode === 'multi') {
+  if (isMultiLayout()) {
     if (!game.lastVisitLabels) game.lastVisitLabels = {};
     if (!game.lastVisitTotals) game.lastVisitTotals = {};
     game.lastVisitLabels[who] = labels;
@@ -793,7 +788,7 @@ function endTurn(bust) {
     updateAvg(who);
     updateLastVisit(who, game.dartScores);
     game.scores[who] = game.scoreAtTurnStart;
-    if (session.mode !== 'multi') {
+    if (!isMultiLayout()) {
       const id = who === 0 ? 'score-p1' : 'score-p2';
       document.getElementById(id).textContent = game.scoreAtTurnStart;
     }
@@ -809,7 +804,7 @@ function endTurn(bust) {
     game.legTotalThrows[who] += game.dartsThrown;
     updateAvg(who);
     updateLastVisit(who, game.dartScores);
-    if (session.mode !== 'multi') {
+    if (!isMultiLayout()) {
       const id = who === 0 ? 'score-p1' : 'score-p2';
       document.getElementById(id).textContent = remaining;
     }
@@ -824,7 +819,7 @@ function endTurn(bust) {
   }
   visitHistory.push(visitSnapshot);
   resetTurn();
-  const nextPlayer = session.mode === 'multi'
+  const nextPlayer = isMultiLayout()
     ? (who + 1) % session.names.length
     : 1 - who;
   switchTurn(nextPlayer);
@@ -881,7 +876,7 @@ function switchTurn(who) {
   game.turn = who;
   game.scoreAtTurnStart = game.scores[who];
 
-  if (session.mode === 'multi') {
+  if (isMultiLayout()) {
     renderMultiScoreboard();
     document.getElementById('turn-text').textContent = session.names[who] + ' — pick a number';
     updateCheckout();
@@ -1106,7 +1101,7 @@ function buildDart(number, multiplier) {
 function updateAvg(who) {
   if (game.totalThrows[who] === 0) return;
   const avg = (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1);
-  if (session.mode === 'multi') {
+  if (isMultiLayout()) {
     if (who === game.turn) {
       const el = document.querySelector('#mp-active .player-avg');
       if (el) el.textContent = 'Avg: ' + avg;
@@ -1132,7 +1127,7 @@ function endGame(who) {
 
   if (session.legsWon[who] >= session.legsToWin) {
     document.getElementById('gameover-name').textContent = session.names[who];
-    if (session.mode === 'multi') {
+    if (isMultiLayout()) {
       const standings = session.names
         .map((name, i) => ({name, legs: session.legsWon[i]}))
         .sort((a, b) => b.legs - a.legs);
@@ -1153,10 +1148,10 @@ function endGame(who) {
   } else {
     const capturedId = gameId;
     const n = session.names.length;
-    const nextStarter = session.mode === 'multi'
+    const nextStarter = isMultiLayout()
       ? (session.legStartPlayer + 1) % n
       : 1 - session.legStartPlayer;
-    const scoreText = session.mode === 'multi'
+    const scoreText = isMultiLayout()
       ? session.names[who] + ' wins the leg!'
       : session.names[who] + ' wins! ' + session.legsWon[0] + '–' + session.legsWon[1];
     document.getElementById('turn-text').textContent = scoreText;
@@ -1172,7 +1167,7 @@ function endGame(who) {
 // ── UNDO VOM GAME OVER ────────────────────────────────────
 // Punkt 3: Stats sauber zurücksetzen beim Undo
 function undoFromGameover() {
-  if (session.mode === 'multi') return;
+  if (isMultiLayout()) return;
   botState.rethrowPending = false;
   const who = game.turn;
 
@@ -1282,7 +1277,7 @@ function selectStatsTab(idx) {
   statsActiveTab = idx;
   document.querySelectorAll('.stats-tabs .stats-tab').forEach((btn, i) => btn.classList.toggle('active', i === idx));
   const data = getStatsTabs()[idx].data;
-  document.getElementById('stats-data-content').innerHTML = session.mode === 'multi'
+  document.getElementById('stats-data-content').innerHTML = isMultiLayout()
     ? buildSinglePlayerStatsHtml(data, statsActivePlayer)
     : buildStatsHtml(data);
 }
@@ -1307,7 +1302,7 @@ function getStatsTabs() {
 
 function buildStatsScreen() {
   const tabs = getStatsTabs();
-  const isMulti = session.mode === 'multi';
+  const isMulti = isMultiLayout();
   const tabsHtml = tabs.length > 1
     ? '<div class="stats-tabs">' +
       tabs.map((t, i) => `<button class="stats-tab${i === statsActiveTab ? ' active' : ''}" onclick="selectStatsTab(${i})">${escHtml(t.label)}</button>`).join('') +
