@@ -135,6 +135,7 @@ function showMenu() {
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'none';
   document.getElementById('screen-gameover').style.display = 'none';
+  document.getElementById('screen-stats').style.display = 'none';
 }
 
 // ── SCREENS ───────────────────────────────────────────────
@@ -185,7 +186,11 @@ function startGame() {
     scores:[501,501], turn:0, dartsThrown:0, dartScores:[],
     totalThrows:[0,0], totalScored:[0,0],
     pendingMultiplier:1, scoreAtTurnStart:501,
-    inputLocked:false
+    inputLocked:false,
+    visits:[[],[]],
+    checkoutAttempts:[0,0],
+    checkoutHits:[0,0],
+    dartHits:[{},{}]
   };
   botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
   document.getElementById('score-p1').textContent = '501';
@@ -253,6 +258,7 @@ function enterNumber(num) {
 function registerDart(number, multiplier, score, label) {
   const dart = { number, multiplier, score, label };
   game.dartScores.push(dart);
+  if (number > 0) { const h = game.dartHits[game.turn]; h[label] = (h[label]||0)+1; }
   game.dartsThrown++;
   const slot = document.getElementById('dart-' + game.dartsThrown);
   slot.innerHTML = `<span>${label}</span><span class="slot-label">${score}</span>`;
@@ -380,6 +386,7 @@ function endTurn(bust) {
     const id = who === 0 ? 'score-p1' : 'score-p2';
     document.getElementById(id).textContent = game.scoreAtTurnStart;
     game.scores[who] = game.scoreAtTurnStart;
+    game.visits[who].push(0);
   } else {
     const total = game.dartScores.reduce((a,b) => a+b.score, 0);
     const remaining = game.scoreAtTurnStart - total;
@@ -390,8 +397,9 @@ function endTurn(bust) {
     updateLastVisit(who, game.dartScores);
     const id = who === 0 ? 'score-p1' : 'score-p2';
     document.getElementById(id).textContent = remaining;
+    game.visits[who].push(total);
   }
-  if (game.scores[who] === 0) { endGame(who); return; }
+  if (game.scores[who] === 0) { game.checkoutHits[who]++; endGame(who); return; }
   resetTurn();
   switchTurn(1 - who);
 }
@@ -400,6 +408,7 @@ function endTurn(bust) {
 function switchTurn(who) {
   game.turn = who;
   game.scoreAtTurnStart = game.scores[who];
+  if (game.scores[who] <= 170 && CHECKOUTS[game.scores[who]]) game.checkoutAttempts[who]++;
   document.getElementById('block-p1').classList.toggle('active', who === 0);
   document.getElementById('block-p2').classList.toggle('active', who === 1);
   const name = session.names[who];
@@ -472,6 +481,7 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
     result = drawFromDistribution(profile.t20Distribution);
   }
   game.dartScores.push(result);
+  if (result.number > 0) { const h = game.dartHits[game.turn]; h[result.label] = (h[result.label]||0)+1; }
   game.dartsThrown = dartIndex + 1;
   const slot = document.getElementById('dart-' + game.dartsThrown);
   slot.innerHTML = `<span>${result.label}</span><span class="slot-label">${result.score}</span>`;
@@ -613,7 +623,13 @@ function undoFromGameover() {
     game.totalThrows[who] = Math.max(0, game.totalThrows[who] - 1);
     game.totalScored[who] = Math.max(0, game.totalScored[who] - lastDart.score);
     updateAvg(who);
+    if (lastDart.number > 0) {
+      const h = game.dartHits[who];
+      if (h[lastDart.label] > 0) { h[lastDart.label]--; if (!h[lastDart.label]) delete h[lastDart.label]; }
+    }
   }
+  if (game.visits[who].length > 0) game.visits[who].pop();
+  game.checkoutHits[who] = Math.max(0, game.checkoutHits[who] - 1);
 
   game.scores[who] = game.scoreAtTurnStart;
   game.inputLocked = false;
@@ -658,7 +674,102 @@ function closeConfirm() {
   document.getElementById('menu-confirm').style.display = 'none';
 }
 
-function showStats() { alert('Stats kommen in Phase 4! 📊'); }
+function showStats() {
+  const stats = [0,1].map(p => {
+    const v = game.visits[p];
+    const avg = game.totalThrows[p] > 0
+      ? (game.totalScored[p] / game.totalThrows[p] * 3).toFixed(1) : '—';
+    const first3 = v.slice(0,3);
+    const first9avg = first3.length > 0
+      ? (first3.reduce((a,b)=>a+b,0) / first3.length).toFixed(1) : '—';
+    const best = v.length > 0 ? Math.max(...v) : '—';
+    const n = v.length;
+    const pct = x => n > 0 ? Math.round(x/n*100) : 0;
+    const d60m  = pct(v.filter(s=>s<60).length);
+    const d60p  = pct(v.filter(s=>s>=60&&s<100).length);
+    const d100p = pct(v.filter(s=>s>=100&&s<140).length);
+    const d140p = pct(v.filter(s=>s>=140).length);
+    const co = game.checkoutAttempts[p], ch = game.checkoutHits[p];
+    const coStr = co > 0 ? `${ch}/${co} (${Math.round(ch/co*100)}%)` : '—';
+    return { avg, first9avg, best, d60m, d60p, d100p, d140p, coStr };
+  });
+  const [s0,s1] = stats;
+  document.getElementById('stats-content').innerHTML = `
+    <div class="stats-names-row">
+      <div class="stats-player-name">${session.names[0]}</div>
+      <div class="stats-player-name">${session.names[1]}</div>
+    </div>
+    <div class="stats-grid">
+      <div class="sv gold">${s0.avg}</div><div class="sk">AVG</div><div class="sv gold">${s1.avg}</div>
+      <div class="sv">${s0.first9avg}</div><div class="sk">FIRST&nbsp;9</div><div class="sv">${s1.first9avg}</div>
+      <div class="sv">${s0.best}</div><div class="sk">BEST</div><div class="sv">${s1.best}</div>
+    </div>
+    <div class="stats-section-label">SCORE DISTRIBUTION</div>
+    <div class="stats-grid">
+      <div class="sv">${s0.d60m}%</div><div class="sk">60−</div><div class="sv">${s1.d60m}%</div>
+      <div class="sv">${s0.d60p}%</div><div class="sk">60+</div><div class="sv">${s1.d60p}%</div>
+      <div class="sv">${s0.d100p}%</div><div class="sk">100+</div><div class="sv">${s1.d100p}%</div>
+      <div class="sv gold">${s0.d140p}%</div><div class="sk">140+</div><div class="sv gold">${s1.d140p}%</div>
+    </div>
+    <div class="stats-section-label">CHECKOUT</div>
+    <div class="stats-grid">
+      <div class="sv">${s0.coStr}</div><div class="sk">HIT/ATT</div><div class="sv">${s1.coStr}</div>
+    </div>
+    <div class="stats-section-label">DART HEATMAP</div>
+    <div class="stats-heatmaps">
+      <div class="stats-heatmap">
+        <div class="stats-heatmap-name">${session.names[0]}</div>
+        ${buildHeatmapSVG(game.dartHits[0])}
+      </div>
+      <div class="stats-heatmap">
+        <div class="stats-heatmap-name">${session.names[1]}</div>
+        ${buildHeatmapSVG(game.dartHits[1])}
+      </div>
+    </div>`;
+  document.getElementById('screen-gameover').style.display = 'none';
+  document.getElementById('screen-stats').style.display = 'flex';
+}
+
+function hideStats() {
+  document.getElementById('screen-stats').style.display = 'none';
+  document.getElementById('screen-gameover').style.display = 'flex';
+}
+
+function buildHeatmapSVG(hits) {
+  const BOARD = [20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+  const CX=120, CY=120;
+  const R = {b:8, b25:20, si:64, to:74, so:105, dout:116, lbl:128};
+  let max = 1;
+  for (const v of Object.values(hits)) if (v > max) max = v;
+  function pt(deg, r) {
+    const a = (deg-90)*Math.PI/180;
+    return [CX + r*Math.cos(a), CY + r*Math.sin(a)];
+  }
+  function seg(r1, r2, a1, a2) {
+    const [x1,y1]=pt(a1,r2), [x2,y2]=pt(a2,r2), [x3,y3]=pt(a2,r1), [x4,y4]=pt(a1,r1);
+    return `M${x1.toFixed(1)},${y1.toFixed(1)}A${r2},${r2},0,0,1,${x2.toFixed(1)},${y2.toFixed(1)}L${x3.toFixed(1)},${y3.toFixed(1)}A${r1},${r1},0,0,0,${x4.toFixed(1)},${y4.toFixed(1)}Z`;
+  }
+  function col(n) {
+    if (!n) return '#141414';
+    const t = n / max;
+    return `rgb(${~~(20+t*180)},${~~(20+t*148)},${~~(20+t*55)})`;
+  }
+  let s = `<rect x="-15" y="-15" width="270" height="270" fill="#0d0d0d" rx="4"/>`;
+  BOARD.forEach((num, i) => {
+    const a1 = i*18-9, a2 = i*18+9;
+    s += `<path d="${seg(R.b25,R.si,a1,a2)}" fill="${col(hits['S'+num])}" stroke="#222" stroke-width="0.5"/>`;
+    s += `<path d="${seg(R.si,R.to,a1,a2)}" fill="${col(hits['T'+num])}" stroke="#222" stroke-width="0.5"/>`;
+    s += `<path d="${seg(R.to,R.so,a1,a2)}" fill="${col(hits['S'+num])}" stroke="#222" stroke-width="0.5"/>`;
+    s += `<path d="${seg(R.so,R.dout,a1,a2)}" fill="${col(hits['D'+num])}" stroke="#222" stroke-width="0.5"/>`;
+  });
+  s += `<circle cx="${CX}" cy="${CY}" r="${R.b25}" fill="${col(hits['25'])}" stroke="#222" stroke-width="0.5"/>`;
+  s += `<circle cx="${CX}" cy="${CY}" r="${R.b}" fill="${col(hits['Bull'])}" stroke="#222" stroke-width="0.5"/>`;
+  BOARD.forEach((num, i) => {
+    const [lx,ly] = pt(i*18, R.lbl);
+    s += `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="9" font-family="monospace">${num}</text>`;
+  });
+  return `<svg viewBox="-15 -15 270 270" width="100%" xmlns="http://www.w3.org/2000/svg">${s}</svg>`;
+}
 
 function shakeCurrent() {
   const slot = document.getElementById('dart-' + (game.dartsThrown + 1));

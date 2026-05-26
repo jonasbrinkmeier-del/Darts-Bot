@@ -10,7 +10,7 @@ body {
   height:100%; display:flex; justify-content:center;
 }
 
-#screen-menu, #screen-setup, #screen-game, #screen-gameover {
+#screen-menu, #screen-setup, #screen-game, #screen-gameover, #screen-stats {
   width:100%; max-width:420px;
   display:flex; flex-direction:column;
   min-height:100%; overflow-x:hidden;
@@ -204,3 +204,59 @@ body {
 }
 .gameover-btn:active { background:#2a2a2a; transform:scale(0.97); }
 .gameover-btn-stats { border-color:#4a7a4a; color:#7ec87e; }
+
+/* ── STATS ── */
+#screen-stats { overflow-y:auto; flex-direction:column; align-items:stretch; }
+#stats-header {
+  display:flex; align-items:center; gap:1rem;
+  padding:1rem 1.25rem; border-bottom:1px solid #2a2a2a; background:#111;
+  position:sticky; top:0; z-index:10; flex-shrink:0;
+}
+#stats-back {
+  background:none; border:none; color:#888; font-family:'IBM Plex Mono',monospace;
+  font-size:13px; cursor:pointer; padding:0; touch-action:manipulation;
+}
+#stats-title {
+  font-family:'Bebas Neue',sans-serif; font-size:20px;
+  letter-spacing:.1em; color:#c8a84b;
+}
+#stats-content { padding-bottom:2rem; }
+.stats-names-row {
+  display:grid; grid-template-columns:1fr 1fr;
+  padding:.6rem 1rem; background:#161616;
+  border-bottom:2px solid #c8a84b;
+}
+.stats-player-name {
+  font-family:'Bebas Neue',sans-serif; font-size:17px; color:#f0ece0;
+  letter-spacing:.08em; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.stats-section-label {
+  font-size:9px; letter-spacing:.2em; color:#555; text-transform:uppercase;
+  padding:.6rem 1rem .3rem; background:#111; border-top:1px solid #2a2a2a;
+}
+.stats-grid {
+  display:grid; grid-template-columns:1fr 76px 1fr; background:#1a1a1a;
+}
+.stats-grid > * { padding:.45rem .5rem; border-bottom:1px solid #222; }
+.sv {
+  font-family:'Bebas Neue',sans-serif; font-size:19px;
+  color:#f0ece0; text-align:center;
+}
+.sv.gold { color:#c8a84b; }
+.sk {
+  font-size:9px; letter-spacing:.1em; color:#444; text-transform:uppercase;
+  text-align:center; display:flex; align-items:center; justify-content:center;
+  border-left:1px solid #222; border-right:1px solid #222;
+}
+.stats-heatmaps {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:4px; padding:.75rem .75rem 1rem;
+  background:#1a1a1a; border-top:1px solid #2a2a2a;
+}
+.stats-heatmap { display:flex; flex-direction:column; align-items:center; }
+.stats-heatmap-name {
+  font-size:9px; letter-spacing:.1em; color:#555; text-transform:uppercase;
+  margin-bottom:4px; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
+}
