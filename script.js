@@ -506,18 +506,19 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   if (isBust) {
     slot.style.borderColor = '#c0392b';
     slot.style.color = '#c0392b';
-    setTimeout(() => endTurn(true), 600);
+    setTimeout(() => { if (currentGameId !== gameId) return; endTurn(true); }, 600);
     return;
   }
-  document.getElementById('score-p2').textContent = Math.max(0, newRemaining);
-  if (newRemaining === 0) { setTimeout(() => endTurn(false), 600); return; }
-  if (dartIndex + 1 >= 3) { setTimeout(() => endTurn(false), 600); return; }
+  const scoreId = game.turn === 0 ? 'score-p1' : 'score-p2';
+  document.getElementById(scoreId).textContent = Math.max(0, newRemaining);
+  const currentGameId = gameId;
+  if (newRemaining === 0) { setTimeout(() => { if (currentGameId !== gameId) return; endTurn(false); }, 600); return; }
+  if (dartIndex + 1 >= 3) { setTimeout(() => { if (currentGameId !== gameId) return; endTurn(false); }, 600); return; }
   const isCheckout = newRemaining <= 170 && CHECKOUTS[newRemaining] &&
     CHECKOUTS[newRemaining].filter(d => d !== null).length <= (3 - dartIndex - 1);
   const delay = isCheckout ? 2800 : 1680;
-  const currentGameId = gameId;
   setTimeout(() => {
-    if (currentGameId !== gameId) return; // Punkt 4: abgesicherter Timeout
+    if (currentGameId !== gameId) return;
     throwBotDart(profile, dartIndex + 1, nowOnT19);
   }, delay);
 }
@@ -640,10 +641,11 @@ function undoFromGameover() {
     game.totalThrows[who] = Math.max(0, game.totalThrows[who] - visitDarts);
     game.totalScored[who] = Math.max(0, game.totalScored[who] - visitTotal);
     updateAvg(who);
-    if (lastDart.number > 0) {
-      const h = game.dartHits[who];
-      if (h[lastDart.label] > 0) { h[lastDart.label]--; if (!h[lastDart.label]) delete h[lastDart.label]; }
-    }
+    // Alle Darts der Visit aus der Heatmap entfernen (inkl. der noch im Slot verbliebenen)
+    const h = game.dartHits[who];
+    [...game.dartScores, lastDart].forEach(d => {
+      if (d && d.number > 0 && h[d.label]) { h[d.label]--; if (!h[d.label]) delete h[d.label]; }
+    });
   }
   if (game.visits[who].length > 0) game.visits[who].pop();
   game.checkoutHits[who] = Math.max(0, game.checkoutHits[who] - 1);
@@ -693,6 +695,10 @@ function closeConfirm() {
   document.getElementById('menu-confirm').style.display = 'none';
 }
 
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function showStats() {
   const stats = [0,1].map(p => {
     const v = game.visits[p];
@@ -717,8 +723,8 @@ function showStats() {
   const [s0,s1] = stats;
   document.getElementById('stats-content').innerHTML = `
     <div class="stats-names-row">
-      <div class="stats-player-name">${session.names[0]}</div>
-      <div class="stats-player-name">${session.names[1]}</div>
+      <div class="stats-player-name">${escHtml(session.names[0])}</div>
+      <div class="stats-player-name">${escHtml(session.names[1])}</div>
     </div>
     <div class="stats-grid">
       <div class="sv gold">${s0.avg}</div><div class="sk">AVG</div><div class="sv gold">${s1.avg}</div>
@@ -739,11 +745,11 @@ function showStats() {
     <div class="stats-section-label">DART HEATMAP</div>
     <div class="stats-heatmaps">
       <div class="stats-heatmap">
-        <div class="stats-heatmap-name">${session.names[0]}</div>
+        <div class="stats-heatmap-name">${escHtml(session.names[0])}</div>
         ${buildHeatmapSVG(game.dartHits[0])}
       </div>
       <div class="stats-heatmap">
-        <div class="stats-heatmap-name">${session.names[1]}</div>
+        <div class="stats-heatmap-name">${escHtml(session.names[1])}</div>
         ${buildHeatmapSVG(game.dartHits[1])}
       </div>
     </div>`;
