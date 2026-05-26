@@ -73,7 +73,7 @@ body {
 #start-btn:active { background:#b8943a; transform:scale(0.98); }
 
 /* ── STARTER BUTTONS ── */
-#starter-group .format-btn { flex:1; }
+#starter-group .format-btn { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
 /* ── FORMAT BUTTONS ── */
 .format-section { margin-bottom:.75rem; }
@@ -301,4 +301,45 @@ body {
   font-size:9px; letter-spacing:.1em; color:#555; text-transform:uppercase;
   margin-bottom:4px; text-align:center;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; width:100%;
+}
+
+/* ── MULTI SCOREBOARD ── */
+#scoreboard-multi {
+  background:#111; border-bottom:2px solid #c8a84b; width:100%;
+}
+.mp-others-row {
+  display:flex; border-top:1px solid #2a2a2a;
+}
+.mp-other {
+  flex:1; text-align:center; padding:.5rem .25rem;
+  border-right:1px solid #2a2a2a; min-width:0;
+}
+.mp-other:last-child { border-right:none; }
+.mp-other-name {
+  font-family:'Bebas Neue',sans-serif; font-size:11px;
+  letter-spacing:.1em; color:#888;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 2px;
+}
+.mp-other-score {
+  font-family:'Bebas Neue',sans-serif; font-size:26px; line-height:1.1; color:#f0ece0;
+}
+.mp-other-avg { font-size:9px; color:#555; margin-top:2px; }
+
+/* ── SINGLE-PLAYER STATS ── */
+.stats-player-tabs {
+  display:flex; gap:6px; padding:.5rem .75rem; background:#0d0d0d;
+  border-bottom:1px solid #2a2a2a; overflow-x:auto; flex-shrink:0;
+}
+.stats-single-header {
+  font-family:'Bebas Neue',sans-serif; font-size:22px; color:#c8a84b;
+  text-align:center; padding:.75rem; background:#161616;
+  border-bottom:2px solid #c8a84b; letter-spacing:.1em;
+}
+.stats-grid-single {
+  display:grid; grid-template-columns:80px 1fr; background:#1a1a1a;
+}
+.stats-grid-single > * { padding:.45rem .75rem; border-bottom:1px solid #222; }
+.sk-s {
+  font-size:9px; letter-spacing:.1em; color:#444; text-transform:uppercase;
+  display:flex; align-items:center; border-right:1px solid #222;
 }

@@ -24,6 +24,10 @@
       <span class="menu-btn-title">1V1 LOCAL</span>
       <span class="menu-btn-sub">Two players, one device</span>
     </button>
+    <button class="menu-btn" onclick="showModeSetup('multi')">
+      <span class="menu-btn-title">LOCAL MULTIPLAYER</span>
+      <span class="menu-btn-sub">2–5 players, one device</span>
+    </button>
   </div>
 </div>
 
@@ -48,6 +52,19 @@
   <div class="setup-block" id="setup-block-p2">
     <div class="setup-label" id="setup-p2-label">OPPONENT</div>
     <div class="setup-options" id="setup-p2-options"></div>
+  </div>
+  <div class="setup-block" id="setup-block-multi-count" style="display:none">
+    <div class="setup-label">NUMBER OF PLAYERS</div>
+    <div class="format-group">
+      <button class="format-btn mp-count-btn active" onclick="setPlayerCount(2)">2</button>
+      <button class="format-btn mp-count-btn" onclick="setPlayerCount(3)">3</button>
+      <button class="format-btn mp-count-btn" onclick="setPlayerCount(4)">4</button>
+      <button class="format-btn mp-count-btn" onclick="setPlayerCount(5)">5</button>
+    </div>
+  </div>
+  <div class="setup-block" id="setup-block-multi-names" style="display:none">
+    <div class="setup-label">PLAYERS</div>
+    <div id="multi-name-rows"></div>
   </div>
   <div class="setup-block" id="setup-block-format">
     <div class="setup-label">MATCH FORMAT</div>
@@ -109,6 +126,12 @@
         <span class="visit-score" id="visit-score-p2"></span>
       </div>
     </div>
+  </div>
+
+  <!-- MULTI SCOREBOARD -->
+  <div id="scoreboard-multi" style="display:none">
+    <div id="mp-active" class="player-block active" style="padding:1rem 1.5rem;text-align:center;width:100%;box-sizing:border-box;"></div>
+    <div id="mp-others" class="mp-others-row"></div>
   </div>
 
   <!-- CHECKOUT -->

@@ -111,7 +111,8 @@ const ADJACENT = {
 let session = {
   mode:null, names:['',''], isBot:[false,false],
   format:'firstTo', formatValue:1, legsToWin:1,
-  legsWon:[0,0], legStartPlayer:0, startingPlayer:0
+  legsWon:[0,0], legStartPlayer:0, startingPlayer:0,
+  multiNumPlayers:2
 };
 
 // ── BOT STATE ─────────────────────────────────────────────
@@ -138,9 +139,11 @@ let game = {
 
 // ── SHOW MENU ─────────────────────────────────────────────
 function showMenu() {
-  gameId++; // Alle laufenden Bot-Timeouts ungültig machen
+  gameId++;
   const confirm = document.getElementById('menu-confirm');
   if (confirm) confirm.style.display = 'none';
+  document.getElementById('scoreboard').style.display = '';
+  document.getElementById('scoreboard-multi').style.display = 'none';
   document.getElementById('screen-menu').style.display = 'flex';
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'none';
@@ -173,6 +176,11 @@ function updateLiveAvg(who) {
   const totalT = game.totalThrows[who] + game.dartsThrown;
   if (totalT === 0) return;
   const avg = ((game.totalScored[who] + scoredSoFar) / totalT * 3).toFixed(1);
+  if (session.mode === 'multi') {
+    const el = document.querySelector('#mp-active .player-avg');
+    if (el) el.textContent = 'Avg: ' + avg;
+    return;
+  }
   document.getElementById(who === 0 ? 'block-p1' : 'block-p2')
     .querySelector('.player-avg').textContent = 'Avg: ' + avg;
 }
@@ -209,11 +217,25 @@ function undoLastDart() {
 // ── STARTER SELECTION ─────────────────────────────────────
 function setStarter(player) {
   session.startingPlayer = player;
-  document.getElementById('starter-btn-0').classList.toggle('active', player === 0);
-  document.getElementById('starter-btn-1').classList.toggle('active', player === 1);
+  const n = session.mode === 'multi' ? session.multiNumPlayers : 2;
+  for (let i = 0; i < n; i++) {
+    const btn = document.getElementById('starter-btn-' + i);
+    if (btn) btn.classList.toggle('active', i === player);
+  }
 }
 
 function updateStarterButtons() {
+  if (session.mode === 'multi') {
+    const n = session.multiNumPlayers;
+    for (let i = 0; i < n; i++) {
+      const btn = document.getElementById('starter-btn-' + i);
+      if (!btn) continue;
+      btn.textContent = i === 0
+        ? (document.getElementById('input-p1').value.trim() || 'Player 1')
+        : (document.getElementById('input-mp-' + (i+1))?.value.trim() || 'Player ' + (i+1));
+    }
+    return;
+  }
   const p1 = document.getElementById('input-p1').value.trim() || 'Player 1';
   const p2Input = document.getElementById('input-p2');
   const p2 = session.mode === 'bot'
@@ -221,6 +243,40 @@ function updateStarterButtons() {
     : (p2Input ? p2Input.value.trim() || 'Player 2' : 'Player 2');
   document.getElementById('starter-btn-0').textContent = p1;
   document.getElementById('starter-btn-1').textContent = p2;
+}
+
+function rebuildStarterButtons(n) {
+  const group = document.getElementById('starter-group');
+  let html = '';
+  for (let i = 0; i < n; i++) {
+    const name = i === 0
+      ? (document.getElementById('input-p1').value.trim() || 'Player 1')
+      : (document.getElementById('input-mp-' + (i+1))?.value.trim() || 'Player ' + (i+1));
+    html += `<button class="format-btn${session.startingPlayer === i ? ' active' : ''}" id="starter-btn-${i}" onclick="setStarter(${i})">${escHtml(name)}</button>`;
+  }
+  group.innerHTML = html;
+}
+
+function setPlayerCount(n) {
+  const saved = {};
+  for (let i = 2; i <= 5; i++) {
+    const inp = document.getElementById('input-mp-' + i);
+    if (inp) saved[i] = inp.value;
+  }
+  session.multiNumPlayers = n;
+  document.querySelectorAll('.mp-count-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i + 2 === n);
+  });
+  let html = '';
+  for (let i = 2; i <= 5; i++) {
+    const val = escHtml(saved[i] || '');
+    html += `<div class="setup-input-row" id="multi-name-row-${i}" style="${i > n ? 'display:none' : ''}">
+      <input type="text" id="input-mp-${i}" placeholder="Player ${i}" maxlength="12" value="${val}" oninput="updateStarterButtons()" />
+    </div>`;
+  }
+  document.getElementById('multi-name-rows').innerHTML = html;
+  if (session.startingPlayer >= n) session.startingPlayer = 0;
+  rebuildStarterButtons(n);
 }
 
 // ── FORMAT SELECTION ─────────────────────────────────────
@@ -234,6 +290,7 @@ function setFormat(type, value) {
 
 // ── LEG CIRCLES ──────────────────────────────────────────
 function updateLegCircles() {
+  if (session.mode === 'multi') { renderMultiScoreboard(); return; }
   [0,1].forEach(p => {
     const el = document.getElementById('leg-circles-p' + (p+1));
     if (!el) return;
@@ -254,35 +311,53 @@ function showModeSetup(mode) {
   document.querySelectorAll('.format-btn').forEach(btn => btn.classList.remove('active'));
   const activeBtn = document.querySelector(`.format-btn[data-type="${session.format}"][data-value="${session.formatValue}"]`);
   if (activeBtn) activeBtn.classList.add('active');
-  const p2label = document.getElementById('setup-p2-label');
-  const p2options = document.getElementById('setup-p2-options');
-  if (mode === 'bot') {
-    p2label.textContent = 'OPPONENT (BOT)';
-    p2options.innerHTML = `
-      <div class="bot-profile-box">
-        <span class="bot-profile-name">Club Player</span>
-        <span class="bot-profile-avg">~70 avg</span>
-      </div>
-      <button class="saved-btn disabled">
-        <span>More bot profiles</span>
-        <span class="coming-soon">Coming soon</span>
-      </button>`;
+
+  const p2block = document.getElementById('setup-block-p2');
+  const multiCountBlock = document.getElementById('setup-block-multi-count');
+  const multiNamesBlock = document.getElementById('setup-block-multi-names');
+
+  if (mode === 'multi') {
+    p2block.style.display = 'none';
+    multiCountBlock.style.display = '';
+    multiNamesBlock.style.display = '';
+    session.startingPlayer = 0;
+    setPlayerCount(session.multiNumPlayers);
   } else {
-    p2label.textContent = 'PLAYER 2';
-    p2options.innerHTML = `
-      <div class="setup-input-row">
-        <input type="text" id="input-p2" placeholder="Enter name…" maxlength="12" oninput="updateStarterButtons()" />
-      </div>
-      <button class="saved-btn disabled">
-        <span>Saved players</span>
-        <span class="coming-soon">Coming soon</span>
-      </button>`;
+    p2block.style.display = '';
+    multiCountBlock.style.display = 'none';
+    multiNamesBlock.style.display = 'none';
+    const p2label = document.getElementById('setup-p2-label');
+    const p2options = document.getElementById('setup-p2-options');
+    if (mode === 'bot') {
+      p2label.textContent = 'OPPONENT (BOT)';
+      p2options.innerHTML = `
+        <div class="bot-profile-box">
+          <span class="bot-profile-name">Club Player</span>
+          <span class="bot-profile-avg">~70 avg</span>
+        </div>
+        <button class="saved-btn disabled">
+          <span>More bot profiles</span>
+          <span class="coming-soon">Coming soon</span>
+        </button>`;
+    } else {
+      p2label.textContent = 'PLAYER 2';
+      p2options.innerHTML = `
+        <div class="setup-input-row">
+          <input type="text" id="input-p2" placeholder="Enter name…" maxlength="12" oninput="updateStarterButtons()" />
+        </div>
+        <button class="saved-btn disabled">
+          <span>Saved players</span>
+          <span class="coming-soon">Coming soon</span>
+        </button>`;
+    }
+    setStarter(0);
+    updateStarterButtons();
   }
-  setStarter(0);
-  updateStarterButtons();
 }
 
 function startGame() {
+  if (session.mode === 'multi') { startGameMulti(); return; }
+
   const p1name = document.getElementById('input-p1').value.trim() || 'Player 1';
   let p2name;
   if (session.mode === 'bot') {
@@ -303,6 +378,7 @@ function startGame() {
   document.getElementById('block-p1').querySelector('.player-avg').textContent = 'Avg: —';
   document.getElementById('block-p2').querySelector('.player-avg').textContent = 'Avg: —';
 
+  const n = 2;
   game = {
     scores:[501,501], turn:0, dartsThrown:0, dartScores:[],
     totalThrows:[0,0], totalScored:[0,0],
@@ -317,10 +393,52 @@ function startGame() {
     legTotalScored:[0,0],
     legTotalThrows:[0,0],
     legCheckoutAttempts:[0,0],
-    legCheckoutHits:[0,0]
+    legCheckoutHits:[0,0],
+    lastVisitLabels:{}, lastVisitTotals:{}
   };
 
+  document.getElementById('scoreboard').style.display = '';
+  document.getElementById('scoreboard-multi').style.display = 'none';
   updateLegCircles();
+
+  document.getElementById('screen-setup').style.display = 'none';
+  document.getElementById('screen-game').style.display = 'flex';
+
+  startLeg(session.startingPlayer);
+}
+
+function startGameMulti() {
+  const n = session.multiNumPlayers;
+  const names = [document.getElementById('input-p1').value.trim() || 'Player 1'];
+  for (let i = 2; i <= n; i++) {
+    const inp = document.getElementById('input-mp-' + i);
+    names.push(inp ? inp.value.trim() || ('Player ' + i) : 'Player ' + i);
+  }
+  session.names = names;
+  session.isBot = Array(n).fill(false);
+  session.legsToWin = session.format === 'firstTo'
+    ? session.formatValue
+    : Math.ceil(session.formatValue / 2);
+  session.legsWon = Array(n).fill(0);
+  session.legStats = [];
+
+  game = {
+    scores: Array(n).fill(501),
+    turn: 0, dartsThrown: 0, dartScores: [],
+    totalThrows: Array(n).fill(0), totalScored: Array(n).fill(0),
+    pendingMultiplier: 1, scoreAtTurnStart: 501, inputLocked: false,
+    visits: Array.from({length:n}, () => []),
+    checkoutAttempts: Array(n).fill(0), checkoutHits: Array(n).fill(0),
+    dartHits: Array.from({length:n}, () => ({})),
+    legVisits: Array.from({length:n}, () => []),
+    legDartHits: Array.from({length:n}, () => ({})),
+    legTotalScored: Array(n).fill(0), legTotalThrows: Array(n).fill(0),
+    legCheckoutAttempts: Array(n).fill(0), legCheckoutHits: Array(n).fill(0),
+    lastVisitLabels: {}, lastVisitTotals: {}
+  };
+
+  document.getElementById('scoreboard').style.display = 'none';
+  document.getElementById('scoreboard-multi').style.display = '';
 
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
@@ -334,27 +452,32 @@ function startLeg(startPlayer) {
   cancelPendingBotThrow();
   session.legStartPlayer = startPlayer;
 
-  game.scores = [501, 501];
+  const n = session.names.length;
+  game.scores = Array(n).fill(501);
   game.inputLocked = false;
-  game.legVisits = [[], []];
-  game.legDartHits = [{}, {}];
-  game.legTotalScored = [0, 0];
-  game.legTotalThrows = [0, 0];
-  game.legCheckoutAttempts = [0, 0];
-  game.legCheckoutHits = [0, 0];
+  game.legVisits = Array.from({length:n}, () => []);
+  game.legDartHits = Array.from({length:n}, () => ({}));
+  game.legTotalScored = Array(n).fill(0);
+  game.legTotalThrows = Array(n).fill(0);
+  game.legCheckoutAttempts = Array(n).fill(0);
+  game.legCheckoutHits = Array(n).fill(0);
+  game.lastVisitLabels = {};
+  game.lastVisitTotals = {};
 
   botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
   visitHistory = [];
   botVisitRestored = false;
 
-  document.getElementById('score-p1').textContent = '501';
-  document.getElementById('score-p2').textContent = '501';
-  ['p1','p2'].forEach(p => {
-    const d = document.getElementById('visit-darts-' + p);
-    const s = document.getElementById('visit-score-' + p);
-    if (d) d.textContent = '';
-    if (s) s.textContent = '';
-  });
+  if (session.mode !== 'multi') {
+    document.getElementById('score-p1').textContent = '501';
+    document.getElementById('score-p2').textContent = '501';
+    ['p1','p2'].forEach(p => {
+      const d = document.getElementById('visit-darts-' + p);
+      const s = document.getElementById('visit-score-' + p);
+      if (d) d.textContent = '';
+      if (s) s.textContent = '';
+    });
+  }
   document.getElementById('turn-bar').style.background = '';
   document.getElementById('turn-bar').style.color = '';
 
@@ -499,21 +622,28 @@ function undoLastVisit() {
   game.pendingMultiplier = 1;
   game.inputLocked = false;
 
-  // Score-Anzeige aktualisieren
-  const scoreId = who === 0 ? 'score-p1' : 'score-p2';
-  if (entry.bust) {
-    document.getElementById(scoreId).textContent = entry.scoreBefore;
-  } else {
-    updateLiveScore();
-  }
+  const isBot = session.isBot[who] || false;
 
-  // Turn-Indikatoren
-  document.getElementById('block-p1').classList.toggle('active', who === 0);
-  document.getElementById('block-p2').classList.toggle('active', who === 1);
-  const isBot = session.isBot[who];
-  document.getElementById('turn-text').textContent = isBot
-    ? session.names[who] + ' is throwing…'
-    : session.names[who] + ' — pick a number';
+  // Score-Anzeige + Turn-Indikatoren
+  if (session.mode === 'multi') {
+    if (game.lastVisitLabels) game.lastVisitLabels[who] = '';
+    if (game.lastVisitTotals) delete game.lastVisitTotals[who];
+    renderMultiScoreboard();
+    if (!entry.bust) updateLiveScore();
+    document.getElementById('turn-text').textContent = session.names[who] + ' — pick a number';
+  } else {
+    const scoreId = who === 0 ? 'score-p1' : 'score-p2';
+    if (entry.bust) {
+      document.getElementById(scoreId).textContent = entry.scoreBefore;
+    } else {
+      updateLiveScore();
+    }
+    document.getElementById('block-p1').classList.toggle('active', who === 0);
+    document.getElementById('block-p2').classList.toggle('active', who === 1);
+    document.getElementById('turn-text').textContent = isBot
+      ? session.names[who] + ' is throwing…'
+      : session.names[who] + ' — pick a number';
+  }
 
   // Dart-Slots mit alten Darts befüllen
   ['dart-1','dart-2','dart-3'].forEach((id, i) => {
@@ -538,11 +668,13 @@ function undoLastVisit() {
     }
   });
 
-  // Last-Visit-Anzeige des Spielers leeren (vorherige Darts unbekannt)
-  const dartsEl = document.getElementById('visit-darts-p' + (who + 1));
-  const scoreEl = document.getElementById('visit-score-p' + (who + 1));
-  if (dartsEl) dartsEl.textContent = '';
-  if (scoreEl) scoreEl.textContent = '';
+  // Last-Visit-Anzeige leeren (nur für 1v1/bot)
+  if (session.mode !== 'multi') {
+    const dartsEl = document.getElementById('visit-darts-p' + (who + 1));
+    const scoreEl = document.getElementById('visit-score-p' + (who + 1));
+    if (dartsEl) dartsEl.textContent = '';
+    if (scoreEl) scoreEl.textContent = '';
+  }
 
   updateMultiplierUI();
   updateActiveSlot();
@@ -589,6 +721,11 @@ function clearEntry() {
 function updateLiveScore() {
   const scored = game.dartScores.reduce((a,b) => a+b.score, 0);
   const remaining = game.scoreAtTurnStart - scored;
+  if (session.mode === 'multi') {
+    const el = document.getElementById('mp-active-score');
+    if (el) el.textContent = Math.max(0, remaining);
+    return;
+  }
   const id = game.turn === 0 ? 'score-p1' : 'score-p2';
   document.getElementById(id).textContent = Math.max(0, remaining);
 }
@@ -617,6 +754,13 @@ function updateCheckout() {
 function updateLastVisit(who, darts) {
   const total = darts.reduce((a,b) => a+b.score, 0);
   const labels = darts.map(d => d.label).join('·');
+  if (session.mode === 'multi') {
+    if (!game.lastVisitLabels) game.lastVisitLabels = {};
+    if (!game.lastVisitTotals) game.lastVisitTotals = {};
+    game.lastVisitLabels[who] = labels;
+    game.lastVisitTotals[who] = total;
+    return;
+  }
   const dartsEl = document.getElementById('visit-darts-p' + (who + 1));
   const scoreEl = document.getElementById('visit-score-p' + (who + 1));
   if (!dartsEl || !scoreEl) return;
@@ -648,9 +792,11 @@ function endTurn(bust) {
     game.legTotalThrows[who] += game.dartsThrown;
     updateAvg(who);
     updateLastVisit(who, game.dartScores);
-    const id = who === 0 ? 'score-p1' : 'score-p2';
-    document.getElementById(id).textContent = game.scoreAtTurnStart;
     game.scores[who] = game.scoreAtTurnStart;
+    if (session.mode !== 'multi') {
+      const id = who === 0 ? 'score-p1' : 'score-p2';
+      document.getElementById(id).textContent = game.scoreAtTurnStart;
+    }
     game.visits[who].push(0);
     game.legVisits[who].push(0);
   } else {
@@ -663,8 +809,10 @@ function endTurn(bust) {
     game.legTotalThrows[who] += game.dartsThrown;
     updateAvg(who);
     updateLastVisit(who, game.dartScores);
-    const id = who === 0 ? 'score-p1' : 'score-p2';
-    document.getElementById(id).textContent = remaining;
+    if (session.mode !== 'multi') {
+      const id = who === 0 ? 'score-p1' : 'score-p2';
+      document.getElementById(id).textContent = remaining;
+    }
     game.visits[who].push(total);
     game.legVisits[who].push(total);
   }
@@ -672,17 +820,75 @@ function endTurn(bust) {
     game.checkoutHits[who]++;
     game.legCheckoutHits[who]++;
     endGame(who);
-    return; // Gewinn-Visit nicht in visitHistory (undoFromGameover kümmert sich darum)
+    return;
   }
   visitHistory.push(visitSnapshot);
   resetTurn();
-  switchTurn(1 - who);
+  const nextPlayer = session.mode === 'multi'
+    ? (who + 1) % session.names.length
+    : 1 - who;
+  switchTurn(nextPlayer);
+}
+
+// ── MULTI SCOREBOARD ──────────────────────────────────────
+function renderMultiScoreboard() {
+  const who = game.turn;
+  const n = session.names.length;
+
+  // Active player block
+  const avgVal = game.totalThrows[who] > 0
+    ? (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1) : '—';
+  let dotsHtml = '';
+  if (session.legsToWin > 1) {
+    for (let i = 0; i < session.legsToWin; i++)
+      dotsHtml += `<span class="leg-dot${i < session.legsWon[who] ? ' won' : ''}"></span>`;
+  }
+  const vLabels = game.lastVisitLabels?.[who] || '';
+  const vTotal  = game.lastVisitTotals?.[who] != null ? game.lastVisitTotals[who] : '';
+  document.getElementById('mp-active').innerHTML = `
+    <div class="player-label">${escHtml(session.names[who])}</div>
+    <div class="leg-circles">${dotsHtml}</div>
+    <div class="player-score" id="mp-active-score">${game.scores[who]}</div>
+    <div class="player-avg">Avg: ${avgVal}</div>
+    <div class="player-visit">
+      <span class="visit-darts" id="mp-active-visit-darts">${escHtml(String(vLabels))}</span>
+      <span class="visit-score" id="mp-active-visit-score">${vTotal}</span>
+    </div>`;
+
+  // Compact others row
+  let othersHtml = '';
+  for (let i = 0; i < n; i++) {
+    if (i === who) continue;
+    const oAvg = game.totalThrows[i] > 0
+      ? (game.totalScored[i] / game.totalThrows[i] * 3).toFixed(1) : '—';
+    let oDots = '';
+    if (session.legsToWin > 1) {
+      for (let j = 0; j < session.legsToWin; j++)
+        oDots += `<span class="leg-dot${j < session.legsWon[i] ? ' won' : ''}"></span>`;
+    }
+    othersHtml += `<div class="mp-other">
+      <div class="mp-other-name">${escHtml(session.names[i])}</div>
+      <div class="leg-circles">${oDots}</div>
+      <div class="mp-other-score">${game.scores[i]}</div>
+      <div class="mp-other-avg">Avg: ${oAvg}</div>
+    </div>`;
+  }
+  document.getElementById('mp-others').innerHTML = othersHtml;
 }
 
 // ── SWITCH TURNS ──────────────────────────────────────────
 function switchTurn(who) {
   game.turn = who;
   game.scoreAtTurnStart = game.scores[who];
+
+  if (session.mode === 'multi') {
+    renderMultiScoreboard();
+    document.getElementById('turn-text').textContent = session.names[who] + ' — pick a number';
+    updateCheckout();
+    updateActiveSlot();
+    return;
+  }
+
   document.getElementById('block-p1').classList.toggle('active', who === 0);
   document.getElementById('block-p2').classList.toggle('active', who === 1);
   const name = session.names[who];
@@ -900,6 +1106,13 @@ function buildDart(number, multiplier) {
 function updateAvg(who) {
   if (game.totalThrows[who] === 0) return;
   const avg = (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1);
+  if (session.mode === 'multi') {
+    if (who === game.turn) {
+      const el = document.querySelector('#mp-active .player-avg');
+      if (el) el.textContent = 'Avg: ' + avg;
+    }
+    return;
+  }
   const block = document.getElementById(who === 0 ? 'block-p1' : 'block-p2');
   block.querySelector('.player-avg').textContent = 'Avg: ' + avg;
 }
@@ -918,20 +1131,35 @@ function endGame(who) {
   updateLegCircles();
 
   if (session.legsWon[who] >= session.legsToWin) {
-    const avg = game.totalThrows[who] > 0
-      ? (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1) : '—';
     document.getElementById('gameover-name').textContent = session.names[who];
-    const matchLine = session.legsToWin > 1
-      ? `${session.legsWon[0]} – ${session.legsWon[1]}<br>` : '';
-    document.getElementById('gameover-stats').innerHTML =
-      matchLine + 'Average: ' + avg + '<br>Darts thrown: ' + game.totalThrows[who];
+    if (session.mode === 'multi') {
+      const standings = session.names
+        .map((name, i) => ({name, legs: session.legsWon[i]}))
+        .sort((a, b) => b.legs - a.legs);
+      document.getElementById('gameover-stats').innerHTML =
+        standings.map((s, rank) =>
+          `${rank+1}. ${escHtml(s.name)}: ${s.legs} leg${s.legs !== 1 ? 's' : ''}`
+        ).join('<br>');
+    } else {
+      const avg = game.totalThrows[who] > 0
+        ? (game.totalScored[who] / game.totalThrows[who] * 3).toFixed(1) : '—';
+      const matchLine = session.legsToWin > 1
+        ? `${session.legsWon[0]} – ${session.legsWon[1]}<br>` : '';
+      document.getElementById('gameover-stats').innerHTML =
+        matchLine + 'Average: ' + avg + '<br>Darts thrown: ' + game.totalThrows[who];
+    }
     document.getElementById('screen-game').style.display = 'none';
     document.getElementById('screen-gameover').style.display = 'flex';
   } else {
     const capturedId = gameId;
-    const nextStarter = 1 - session.legStartPlayer;
-    document.getElementById('turn-text').textContent =
-      session.names[who] + ' wins! ' + session.legsWon[0] + '–' + session.legsWon[1];
+    const n = session.names.length;
+    const nextStarter = session.mode === 'multi'
+      ? (session.legStartPlayer + 1) % n
+      : 1 - session.legStartPlayer;
+    const scoreText = session.mode === 'multi'
+      ? session.names[who] + ' wins the leg!'
+      : session.names[who] + ' wins! ' + session.legsWon[0] + '–' + session.legsWon[1];
+    document.getElementById('turn-text').textContent = scoreText;
     document.getElementById('turn-bar').style.background = '#1a3a1a';
     document.getElementById('turn-bar').style.color = '#7ec87e';
     setTimeout(() => {
@@ -944,6 +1172,7 @@ function endGame(who) {
 // ── UNDO VOM GAME OVER ────────────────────────────────────
 // Punkt 3: Stats sauber zurücksetzen beim Undo
 function undoFromGameover() {
+  if (session.mode === 'multi') return;
   botState.rethrowPending = false;
   const who = game.turn;
 
@@ -1032,9 +1261,11 @@ function escHtml(s) {
 }
 
 let statsActiveTab = 0;
+let statsActivePlayer = 0;
 
 function showStats() {
   statsActiveTab = 0;
+  statsActivePlayer = 0;
   buildStatsScreen();
   document.getElementById('screen-gameover').style.display = 'none';
   document.getElementById('screen-stats').style.display = 'flex';
@@ -1042,14 +1273,25 @@ function showStats() {
 
 function hideStats() {
   statsActiveTab = 0;
+  statsActivePlayer = 0;
   document.getElementById('screen-stats').style.display = 'none';
   document.getElementById('screen-gameover').style.display = 'flex';
 }
 
 function selectStatsTab(idx) {
   statsActiveTab = idx;
-  document.querySelectorAll('.stats-tab').forEach((btn, i) => btn.classList.toggle('active', i === idx));
-  document.getElementById('stats-data-content').innerHTML = buildStatsHtml(getStatsTabs()[idx].data);
+  document.querySelectorAll('.stats-tabs .stats-tab').forEach((btn, i) => btn.classList.toggle('active', i === idx));
+  const data = getStatsTabs()[idx].data;
+  document.getElementById('stats-data-content').innerHTML = session.mode === 'multi'
+    ? buildSinglePlayerStatsHtml(data, statsActivePlayer)
+    : buildStatsHtml(data);
+}
+
+function selectStatsPlayer(idx) {
+  statsActivePlayer = idx;
+  document.querySelectorAll('.stats-player-tabs .stats-tab').forEach((btn, i) => btn.classList.toggle('active', i === idx));
+  const data = getStatsTabs()[statsActiveTab].data;
+  document.getElementById('stats-data-content').innerHTML = buildSinglePlayerStatsHtml(data, idx);
 }
 
 function getStatsTabs() {
@@ -1065,13 +1307,64 @@ function getStatsTabs() {
 
 function buildStatsScreen() {
   const tabs = getStatsTabs();
+  const isMulti = session.mode === 'multi';
   const tabsHtml = tabs.length > 1
     ? '<div class="stats-tabs">' +
       tabs.map((t, i) => `<button class="stats-tab${i === statsActiveTab ? ' active' : ''}" onclick="selectStatsTab(${i})">${escHtml(t.label)}</button>`).join('') +
       '</div>'
     : '';
-  document.getElementById('stats-content').innerHTML = tabsHtml + '<div id="stats-data-content"></div>';
-  document.getElementById('stats-data-content').innerHTML = buildStatsHtml(tabs[statsActiveTab].data);
+  const playerTabsHtml = isMulti
+    ? '<div class="stats-player-tabs">' +
+      session.names.map((name, i) => `<button class="stats-tab${i === statsActivePlayer ? ' active' : ''}" onclick="selectStatsPlayer(${i})">${escHtml(name)}</button>`).join('') +
+      '</div>'
+    : '';
+  document.getElementById('stats-content').innerHTML = tabsHtml + playerTabsHtml + '<div id="stats-data-content"></div>';
+  const data = tabs[statsActiveTab].data;
+  document.getElementById('stats-data-content').innerHTML = isMulti
+    ? buildSinglePlayerStatsHtml(data, statsActivePlayer)
+    : buildStatsHtml(data);
+}
+
+function buildSinglePlayerStatsHtml(data, p) {
+  const v = data.visits[p];
+  const avg = data.totalThrows[p] > 0
+    ? (data.totalScored[p] / data.totalThrows[p] * 3).toFixed(1) : '—';
+  const first3 = v.slice(0,3);
+  const first9avg = first3.length > 0
+    ? (first3.reduce((a,b)=>a+b,0) / first3.length).toFixed(1) : '—';
+  const best = v.length > 0 ? Math.max(...v) : '—';
+  const n = v.length;
+  const pct = x => n > 0 ? Math.round(x/n*100) : 0;
+  const c60m  = v.filter(s=>s<60).length;
+  const c60p  = v.filter(s=>s>=60&&s<100).length;
+  const c100p = v.filter(s=>s>=100&&s<140).length;
+  const c140p = v.filter(s=>s>=140).length;
+  const co = data.checkoutAttempts[p], ch = data.checkoutHits[p];
+  const coStr = co > 0 ? `${ch}/${co} (${Math.round(ch/co*100)}%)` : '—';
+  return `
+    <div class="stats-single-header">${escHtml(session.names[p])}</div>
+    <div class="stats-grid-single">
+      <div class="sk-s">AVG</div><div class="sv gold">${avg}</div>
+      <div class="sk-s">FIRST 9</div><div class="sv">${first9avg}</div>
+      <div class="sk-s">BEST</div><div class="sv">${best}</div>
+    </div>
+    <div class="stats-section-label">SCORE DISTRIBUTION</div>
+    <div class="stats-grid-single">
+      <div class="sk-s">60−</div><div class="sv-d">${c60m}x / ${pct(c60m)}%</div>
+      <div class="sk-s">60+</div><div class="sv-d">${c60p}x / ${pct(c60p)}%</div>
+      <div class="sk-s">100+</div><div class="sv-d">${c100p}x / ${pct(c100p)}%</div>
+      <div class="sk-s">140+</div><div class="sv-d gold">${c140p}x / ${pct(c140p)}%</div>
+    </div>
+    <div class="stats-section-label">CHECKOUT</div>
+    <div class="stats-grid-single">
+      <div class="sk-s">HIT/ATT</div><div class="sv">${coStr}</div>
+    </div>
+    <div class="stats-section-label">DART HEATMAP</div>
+    <div class="stats-heatmaps">
+      <div class="stats-heatmap" style="max-width:280px;margin:0 auto">
+        ${buildHeatmapSVG(data.dartHits[p])}
+      </div>
+    </div>`;
 }
 
 function buildStatsHtml(data) {
