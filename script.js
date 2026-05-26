@@ -203,6 +203,13 @@ function startGame() {
     if (d) d.textContent = '';
     if (s) s.textContent = '';
   });
+  ['dart-1','dart-2','dart-3'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '—';
+    el.classList.remove('filled','active-slot');
+    el.style.borderColor = '';
+    el.style.color = '';
+  });
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
   resetMultiplierUI();
