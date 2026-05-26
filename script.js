@@ -111,7 +111,7 @@ const ADJACENT = {
 let session = {
   mode:null, names:['',''], isBot:[false,false],
   format:'firstTo', formatValue:1, legsToWin:1,
-  legsWon:[0,0], legStartPlayer:0
+  legsWon:[0,0], legStartPlayer:0, startingPlayer:0
 };
 
 // ── BOT STATE ─────────────────────────────────────────────
@@ -206,6 +206,23 @@ function undoLastDart() {
   updateActiveSlot();
 }
 
+// ── STARTER SELECTION ─────────────────────────────────────
+function setStarter(player) {
+  session.startingPlayer = player;
+  document.getElementById('starter-btn-0').classList.toggle('active', player === 0);
+  document.getElementById('starter-btn-1').classList.toggle('active', player === 1);
+}
+
+function updateStarterButtons() {
+  const p1 = document.getElementById('input-p1').value.trim() || 'Player 1';
+  const p2Input = document.getElementById('input-p2');
+  const p2 = session.mode === 'bot'
+    ? 'Club Player'
+    : (p2Input ? p2Input.value.trim() || 'Player 2' : 'Player 2');
+  document.getElementById('starter-btn-0').textContent = p1;
+  document.getElementById('starter-btn-1').textContent = p2;
+}
+
 // ── FORMAT SELECTION ─────────────────────────────────────
 function setFormat(type, value) {
   session.format = type;
@@ -254,13 +271,15 @@ function showModeSetup(mode) {
     p2label.textContent = 'PLAYER 2';
     p2options.innerHTML = `
       <div class="setup-input-row">
-        <input type="text" id="input-p2" placeholder="Enter name…" maxlength="12" />
+        <input type="text" id="input-p2" placeholder="Enter name…" maxlength="12" oninput="updateStarterButtons()" />
       </div>
       <button class="saved-btn disabled">
         <span>Saved players</span>
         <span class="coming-soon">Coming soon</span>
       </button>`;
   }
+  setStarter(0);
+  updateStarterButtons();
 }
 
 function startGame() {
@@ -306,7 +325,7 @@ function startGame() {
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
 
-  startLeg(0);
+  startLeg(session.startingPlayer);
 }
 
 function startLeg(startPlayer) {

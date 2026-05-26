@@ -37,7 +37,7 @@
     <div class="setup-label">PLAYER 1</div>
     <div class="setup-options">
       <div class="setup-input-row">
-        <input type="text" id="input-p1" placeholder="Enter name…" maxlength="12" />
+        <input type="text" id="input-p1" placeholder="Enter name…" maxlength="12" oninput="updateStarterButtons()" />
       </div>
       <button class="saved-btn disabled">
         <span>Saved players</span>
@@ -71,6 +71,13 @@
         <button class="format-btn" data-type="bestOf" data-value="9" onclick="setFormat('bestOf',9)">9</button>
         <button class="format-btn" data-type="bestOf" data-value="11" onclick="setFormat('bestOf',11)">11</button>
       </div>
+    </div>
+  </div>
+  <div class="setup-block" id="setup-block-starter">
+    <div class="setup-label">WHO STARTS?</div>
+    <div class="format-group" id="starter-group">
+      <button class="format-btn active" id="starter-btn-0" onclick="setStarter(0)">Player 1</button>
+      <button class="format-btn" id="starter-btn-1" onclick="setStarter(1)">Player 2</button>
     </div>
   </div>
   <button id="start-btn" onclick="startGame()">Start Game →</button>

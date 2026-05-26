@@ -72,6 +72,9 @@ body {
 }
 #start-btn:active { background:#b8943a; transform:scale(0.98); }
 
+/* ── STARTER BUTTONS ── */
+#starter-group .format-btn { flex:1; }
+
 /* ── FORMAT BUTTONS ── */
 .format-section { margin-bottom:.75rem; }
 .format-section:last-child { margin-bottom:0; }
