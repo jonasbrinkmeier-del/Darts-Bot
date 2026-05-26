@@ -240,6 +240,18 @@ body {
   letter-spacing:.1em; color:#c8a84b;
 }
 #stats-content { padding-bottom:2rem; }
+.stats-tabs {
+  display:flex; gap:6px; padding:.5rem .75rem; background:#111;
+  border-bottom:1px solid #2a2a2a; overflow-x:auto; flex-shrink:0;
+}
+.stats-tab {
+  background:#1a1a1a; border:1px solid #2a2a2a; border-radius:4px;
+  color:#555; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+  padding:.35rem .65rem; cursor:pointer; white-space:nowrap;
+  touch-action:manipulation; transition:all .1s; flex-shrink:0;
+}
+.stats-tab:active { transform:scale(0.95); }
+.stats-tab.active { background:#2a2010; border-color:#c8a84b; color:#c8a84b; }
 .stats-names-row {
   display:grid; grid-template-columns:1fr 1fr;
   padding:.6rem 1rem; background:#161616;

@@ -121,6 +121,8 @@ let botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
 // Jedes neue Spiel bekommt eine neue ID. Bot-Timeouts prüfen
 // ob ihre ID noch aktuell ist bevor sie ausführen.
 let gameId = 0;
+let pendingEndTurnId = null;
+let pendingBotId = null;
 
 // ── GAME STATE ────────────────────────────────────────────
 let game = {
@@ -140,6 +142,64 @@ function showMenu() {
   document.getElementById('screen-game').style.display = 'none';
   document.getElementById('screen-gameover').style.display = 'none';
   document.getElementById('screen-stats').style.display = 'none';
+}
+
+// ── PENDING TURN HELPERS ─────────────────────────────────
+function cancelPendingEndTurn() {
+  if (pendingEndTurnId !== null) { clearTimeout(pendingEndTurnId); pendingEndTurnId = null; }
+  game.inputLocked = false;
+}
+
+function cancelPendingBotThrow() {
+  if (pendingBotId !== null) { clearTimeout(pendingBotId); pendingBotId = null; }
+}
+
+function scheduleEndTurn(bust, delayMs) {
+  const capturedId = gameId;
+  pendingEndTurnId = setTimeout(() => {
+    pendingEndTurnId = null;
+    if (capturedId !== gameId) return;
+    endTurn(bust);
+  }, delayMs);
+}
+
+// ── LIVE AVERAGE ─────────────────────────────────────────
+function updateLiveAvg(who) {
+  const scoredSoFar = game.dartScores.reduce((a,b) => a+b.score, 0);
+  const totalT = game.totalThrows[who] + game.dartsThrown;
+  if (totalT === 0) return;
+  const avg = ((game.totalScored[who] + scoredSoFar) / totalT * 3).toFixed(1);
+  document.getElementById(who === 0 ? 'block-p1' : 'block-p2')
+    .querySelector('.player-avg').textContent = 'Avg: ' + avg;
+}
+
+// ── UNDO LAST DART (shared) ───────────────────────────────
+function undoLastDart() {
+  const dart = game.dartScores.pop();
+  game.dartsThrown--;
+  if (dart) {
+    if (dart.number > 0) {
+      const h = game.dartHits[game.turn];
+      if (h[dart.label]) { h[dart.label]--; if (!h[dart.label]) delete h[dart.label]; }
+      const lh = game.legDartHits[game.turn];
+      if (lh[dart.label]) { lh[dart.label]--; if (!lh[dart.label]) delete lh[dart.label]; }
+    }
+    if (dart.isCheckoutAttempt) {
+      game.checkoutAttempts[game.turn] = Math.max(0, game.checkoutAttempts[game.turn] - 1);
+      game.legCheckoutAttempts[game.turn] = Math.max(0, game.legCheckoutAttempts[game.turn] - 1);
+    }
+  }
+  const slot = document.getElementById('dart-' + (game.dartsThrown + 1));
+  slot.innerHTML = '—';
+  slot.classList.remove('filled');
+  slot.style.borderColor = '';
+  slot.style.color = '';
+  game.inputLocked = false;
+  resetMultiplierUI();
+  updateLiveScore();
+  updateLiveAvg(game.turn);
+  updateCheckout();
+  updateActiveSlot();
 }
 
 // ── FORMAT SELECTION ─────────────────────────────────────
@@ -213,6 +273,7 @@ function startGame() {
     ? session.formatValue
     : Math.ceil(session.formatValue / 2);
   session.legsWon = [0, 0];
+  session.legStats = [];
 
   document.getElementById('label-p1').textContent = p1name;
   document.getElementById('label-p2').textContent = p2name;
@@ -227,7 +288,13 @@ function startGame() {
     visits:[[],[]],
     checkoutAttempts:[0,0],
     checkoutHits:[0,0],
-    dartHits:[{},{}]
+    dartHits:[{},{}],
+    legVisits:[[],[]],
+    legDartHits:[{},{}],
+    legTotalScored:[0,0],
+    legTotalThrows:[0,0],
+    legCheckoutAttempts:[0,0],
+    legCheckoutHits:[0,0]
   };
 
   updateLegCircles();
@@ -240,10 +307,18 @@ function startGame() {
 
 function startLeg(startPlayer) {
   gameId++;
+  cancelPendingEndTurn();
+  cancelPendingBotThrow();
   session.legStartPlayer = startPlayer;
 
   game.scores = [501, 501];
   game.inputLocked = false;
+  game.legVisits = [[], []];
+  game.legDartHits = [{}, {}];
+  game.legTotalScored = [0, 0];
+  game.legTotalThrows = [0, 0];
+  game.legCheckoutAttempts = [0, 0];
+  game.legCheckoutHits = [0, 0];
 
   botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
 
@@ -309,15 +384,22 @@ function enterNumber(num) {
 
 // ── DART REGISTRIEREN ─────────────────────────────────────
 function registerDart(number, multiplier, score, label) {
-  const dart = { number, multiplier, score, label };
+  const dart = { number, multiplier, score, label, isCheckoutAttempt: false };
   game.dartScores.push(dart);
-  if (number > 0) { const h = game.dartHits[game.turn]; h[label] = (h[label]||0)+1; }
+  if (number > 0) {
+    const h = game.dartHits[game.turn]; h[label] = (h[label]||0)+1;
+    const lh = game.legDartHits[game.turn]; lh[label] = (lh[label]||0)+1;
+  }
   const _rb = game.scoreAtTurnStart - game.dartScores.slice(0,-1).reduce((a,b)=>a+b.score,0);
   if (_rb >= 2 && CHECKOUTS[_rb]) {
-    if (multiplier === 2 || label === 'Bull' || (score === 0 && _rb % 2 === 0 && _rb <= 50))
+    if (multiplier === 2 || label === 'Bull' || (score === 0 && _rb % 2 === 0 && _rb <= 50)) {
+      dart.isCheckoutAttempt = true;
       game.checkoutAttempts[game.turn]++;
+      game.legCheckoutAttempts[game.turn]++;
+    }
   }
   game.dartsThrown++;
+  updateLiveAvg(game.turn);
   const slot = document.getElementById('dart-' + game.dartsThrown);
   slot.innerHTML = `<span>${label}</span><span class="slot-label">${score}</span>`;
   slot.classList.add('filled');
@@ -331,66 +413,39 @@ function registerDart(number, multiplier, score, label) {
     game.inputLocked = true;
     slot.style.borderColor = '#c0392b';
     slot.style.color = '#c0392b';
-    setTimeout(() => endTurn(true), 600);
+    scheduleEndTurn(true, game.dartsThrown >= 3 ? 2000 : 600);
     return;
   }
   if (remaining === 0) {
     game.inputLocked = true;
     updateLiveScore();
-    setTimeout(() => endTurn(false), 400);
+    scheduleEndTurn(false, 400);
     return;
   }
   updateLiveScore();
   updateCheckout();
   updateActiveSlot();
-  if (game.dartsThrown === 3) endTurn(false);
+  if (game.dartsThrown >= 3) {
+    game.inputLocked = true;
+    scheduleEndTurn(false, 2000);
+  }
 }
 
 // ── UNDO ──────────────────────────────────────────────────
 function clearEntry() {
-  if (game.inputLocked) return;
+  if (game.dartsThrown === 0) return;
+  cancelPendingEndTurn();
+  cancelPendingBotThrow();
+  undoLastDart();
   if (session.isBot[game.turn]) {
-    if (game.dartsThrown > 0) undoBotDart();
-    return;
+    const dartIndex = game.dartsThrown;
+    const capturedId = gameId;
+    pendingBotId = setTimeout(() => {
+      pendingBotId = null;
+      if (capturedId !== gameId) return;
+      throwBotDart(BOT_PROFILES['Club Player'], dartIndex, false);
+    }, 2500);
   }
-  if (game.dartsThrown > 0) {
-    game.dartsThrown--;
-    game.dartScores.pop();
-    const slot = document.getElementById('dart-' + (game.dartsThrown + 1));
-    slot.innerHTML = '—';
-    slot.classList.remove('filled');
-    slot.style.borderColor = '';
-    slot.style.color = '';
-    resetMultiplierUI();
-    updateLiveScore();
-    updateCheckout();
-    updateActiveSlot();
-  }
-}
-
-// ── BOT DART UNDO + RETHROW ───────────────────────────────
-function undoBotDart() {
-  botState.rethrowPending = false;
-  game.dartsThrown--;
-  game.dartScores.pop();
-  const slot = document.getElementById('dart-' + (game.dartsThrown + 1));
-  slot.innerHTML = '—';
-  slot.classList.remove('filled');
-  slot.style.borderColor = '';
-  slot.style.color = '';
-  updateLiveScore();
-  const dartIndex = game.dartsThrown;
-  const currentGameId = gameId;
-  botState.rethrowPending = true;
-  botState.rethrowIndex = dartIndex;
-  setTimeout(() => {
-    if (currentGameId !== gameId) return;
-    if (!botState.rethrowPending) return;
-    if (game.dartsThrown !== botState.rethrowIndex) return;
-    if (!session.isBot[game.turn]) return;
-    botState.rethrowPending = false;
-    throwBotDart(BOT_PROFILES['Club Player'], dartIndex, false);
-  }, 2520);
 }
 
 // ── LIVE SCORE ────────────────────────────────────────────
@@ -435,29 +490,39 @@ function updateLastVisit(who, darts) {
 // ── END TURN ──────────────────────────────────────────────
 function endTurn(bust) {
   botState.rethrowPending = false;
+  pendingEndTurnId = null;
   const who = game.turn;
   if (bust) {
-    // Punkt 2: Bust-Darts zählen in die Statistik
     game.totalThrows[who] += game.dartsThrown;
+    game.legTotalThrows[who] += game.dartsThrown;
     updateAvg(who);
     updateLastVisit(who, game.dartScores);
     const id = who === 0 ? 'score-p1' : 'score-p2';
     document.getElementById(id).textContent = game.scoreAtTurnStart;
     game.scores[who] = game.scoreAtTurnStart;
     game.visits[who].push(0);
+    game.legVisits[who].push(0);
   } else {
     const total = game.dartScores.reduce((a,b) => a+b.score, 0);
     const remaining = game.scoreAtTurnStart - total;
     game.scores[who] = remaining;
     game.totalScored[who] += total;
     game.totalThrows[who] += game.dartsThrown;
+    game.legTotalScored[who] += total;
+    game.legTotalThrows[who] += game.dartsThrown;
     updateAvg(who);
     updateLastVisit(who, game.dartScores);
     const id = who === 0 ? 'score-p1' : 'score-p2';
     document.getElementById(id).textContent = remaining;
     game.visits[who].push(total);
+    game.legVisits[who].push(total);
   }
-  if (game.scores[who] === 0) { game.checkoutHits[who]++; endGame(who); return; }
+  if (game.scores[who] === 0) {
+    game.checkoutHits[who]++;
+    game.legCheckoutHits[who]++;
+    endGame(who);
+    return;
+  }
   resetTurn();
   switchTurn(1 - who);
 }
@@ -477,8 +542,9 @@ function switchTurn(who) {
   updateActiveSlot();
   if (isBot) {
     const currentGameId = gameId;
-    setTimeout(() => {
-      if (currentGameId !== gameId) return; // Punkt 4: abgesicherter Timeout
+    pendingBotId = setTimeout(() => {
+      pendingBotId = null;
+      if (currentGameId !== gameId) return;
       botThrowSequence();
     }, 1120);
   }
@@ -548,20 +614,30 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   const dartsLeft = 3 - dartIndex;
   const zone = getBotScoringZone(profile, remaining, dartsLeft, alreadySwitchedToT19);
   const nowOnT19 = alreadySwitchedToT19 || zone === 't19';
+  let isCheckoutAttempt = false;
   let result;
   if (zone === 'checkout') {
     const route = CHECKOUTS[remaining].filter(d => d !== null);
     const _tgt = route[0];
-    if (_tgt[0] === 'D' || _tgt === 'Bull') game.checkoutAttempts[game.turn]++;
+    if (_tgt[0] === 'D' || _tgt === 'Bull') {
+      isCheckoutAttempt = true;
+      game.checkoutAttempts[game.turn]++;
+      game.legCheckoutAttempts[game.turn]++;
+    }
     result = resolveFinishingDart(profile, _tgt);
   } else if (zone === 't19') {
     result = drawFromDistribution(t19Dist);
   } else {
     result = drawFromDistribution(t20Dist);
   }
+  result.isCheckoutAttempt = isCheckoutAttempt;
   game.dartScores.push(result);
-  if (result.number > 0) { const h = game.dartHits[game.turn]; h[result.label] = (h[result.label]||0)+1; }
+  if (result.number > 0) {
+    const h = game.dartHits[game.turn]; h[result.label] = (h[result.label]||0)+1;
+    const lh = game.legDartHits[game.turn]; lh[result.label] = (lh[result.label]||0)+1;
+  }
   game.dartsThrown = dartIndex + 1;
+  updateLiveAvg(game.turn);
   const slot = document.getElementById('dart-' + game.dartsThrown);
   slot.innerHTML = `<span>${result.label}</span><span class="slot-label">${result.score}</span>`;
   slot.classList.add('filled');
@@ -572,17 +648,18 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   if (isBust) {
     slot.style.borderColor = '#c0392b';
     slot.style.color = '#c0392b';
-    setTimeout(() => { if (currentGameId !== gameId) return; endTurn(true); }, 600);
+    scheduleEndTurn(true, dartIndex + 1 >= 3 ? 2000 : 600);
     return;
   }
   const scoreId = game.turn === 0 ? 'score-p1' : 'score-p2';
   document.getElementById(scoreId).textContent = Math.max(0, newRemaining);
-  if (newRemaining === 0) { setTimeout(() => { if (currentGameId !== gameId) return; endTurn(false); }, 600); return; }
-  if (dartIndex + 1 >= 3) { setTimeout(() => { if (currentGameId !== gameId) return; endTurn(false); }, 600); return; }
+  if (newRemaining === 0) { scheduleEndTurn(false, 400); return; }
+  if (dartIndex + 1 >= 3) { scheduleEndTurn(false, 2000); return; }
   const isCheckout = newRemaining <= 170 && CHECKOUTS[newRemaining] &&
     CHECKOUTS[newRemaining].filter(d => d !== null).length <= (3 - dartIndex - 1);
   const delay = isCheckout ? 2800 : 1680;
-  setTimeout(() => {
+  pendingBotId = setTimeout(() => {
+    pendingBotId = null;
     if (currentGameId !== gameId) return;
     throwBotDart(profile, dartIndex + 1, nowOnT19);
   }, delay);
@@ -678,6 +755,14 @@ function updateAvg(who) {
 // ── GAME OVER ─────────────────────────────────────────────
 function endGame(who) {
   session.legsWon[who]++;
+  session.legStats.push({
+    visits:         game.legVisits.map(a => [...a]),
+    dartHits:       game.legDartHits.map(h => ({...h})),
+    totalScored:    [...game.legTotalScored],
+    totalThrows:    [...game.legTotalThrows],
+    checkoutAttempts: [...game.legCheckoutAttempts],
+    checkoutHits:   [...game.legCheckoutHits]
+  });
   updateLegCircles();
 
   if (session.legsWon[who] >= session.legsToWin) {
@@ -718,23 +803,34 @@ function undoFromGameover() {
   const lastDart = game.dartScores.pop();
   game.dartsThrown--;
 
-  // Stats zurücksetzen — gesamte Visit rückgängig, nicht nur letzter Dart
   if (lastDart) {
+    // Undo overall stats
     game.totalThrows[who] = Math.max(0, game.totalThrows[who] - visitDarts);
     game.totalScored[who] = Math.max(0, game.totalScored[who] - visitTotal);
     updateAvg(who);
-    // Alle Darts der Visit aus der Heatmap entfernen (inkl. der noch im Slot verbliebenen)
     const h = game.dartHits[who];
     [...game.dartScores, lastDart].forEach(d => {
       if (d && d.number > 0 && h[d.label]) { h[d.label]--; if (!h[d.label]) delete h[d.label]; }
     });
+    // Undo leg stats
+    game.legTotalThrows[who] = Math.max(0, game.legTotalThrows[who] - visitDarts);
+    game.legTotalScored[who] = Math.max(0, game.legTotalScored[who] - visitTotal);
+    const lh = game.legDartHits[who];
+    [...game.dartScores, lastDart].forEach(d => {
+      if (d && d.number > 0 && lh[d.label]) { lh[d.label]--; if (!lh[d.label]) delete lh[d.label]; }
+    });
+    if (lastDart.isCheckoutAttempt) {
+      game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
+      game.legCheckoutAttempts[who] = Math.max(0, game.legCheckoutAttempts[who] - 1);
+    }
   }
   if (game.visits[who].length > 0) game.visits[who].pop();
+  if (game.legVisits[who].length > 0) game.legVisits[who].pop();
   game.checkoutHits[who] = Math.max(0, game.checkoutHits[who] - 1);
+  game.legCheckoutHits[who] = Math.max(0, game.legCheckoutHits[who] - 1);
+  if (session.legStats.length > 0) session.legStats.pop();
   session.legsWon[who] = Math.max(0, session.legsWon[who] - 1);
   updateLegCircles();
-  if (lastDart && (lastDart.multiplier === 2 || lastDart.label === 'Bull'))
-    game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
 
   game.scores[who] = game.scoreAtTurnStart;
   game.inputLocked = false;
@@ -783,11 +879,54 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+let statsActiveTab = 0;
+
 function showStats() {
+  statsActiveTab = 0;
+  buildStatsScreen();
+  document.getElementById('screen-gameover').style.display = 'none';
+  document.getElementById('screen-stats').style.display = 'flex';
+}
+
+function hideStats() {
+  statsActiveTab = 0;
+  document.getElementById('screen-stats').style.display = 'none';
+  document.getElementById('screen-gameover').style.display = 'flex';
+}
+
+function selectStatsTab(idx) {
+  statsActiveTab = idx;
+  document.querySelectorAll('.stats-tab').forEach((btn, i) => btn.classList.toggle('active', i === idx));
+  document.getElementById('stats-data-content').innerHTML = buildStatsHtml(getStatsTabs()[idx].data);
+}
+
+function getStatsTabs() {
+  const overall = {
+    visits: game.visits, dartHits: game.dartHits,
+    totalScored: game.totalScored, totalThrows: game.totalThrows,
+    checkoutAttempts: game.checkoutAttempts, checkoutHits: game.checkoutHits
+  };
+  const tabs = [{ label: 'Overall', data: overall }];
+  session.legStats.forEach((ls, i) => tabs.push({ label: 'Leg ' + (i + 1), data: ls }));
+  return tabs;
+}
+
+function buildStatsScreen() {
+  const tabs = getStatsTabs();
+  const tabsHtml = tabs.length > 1
+    ? '<div class="stats-tabs">' +
+      tabs.map((t, i) => `<button class="stats-tab${i === statsActiveTab ? ' active' : ''}" onclick="selectStatsTab(${i})">${escHtml(t.label)}</button>`).join('') +
+      '</div>'
+    : '';
+  document.getElementById('stats-content').innerHTML = tabsHtml + '<div id="stats-data-content"></div>';
+  document.getElementById('stats-data-content').innerHTML = buildStatsHtml(tabs[statsActiveTab].data);
+}
+
+function buildStatsHtml(data) {
   const stats = [0,1].map(p => {
-    const v = game.visits[p];
-    const avg = game.totalThrows[p] > 0
-      ? (game.totalScored[p] / game.totalThrows[p] * 3).toFixed(1) : '—';
+    const v = data.visits[p];
+    const avg = data.totalThrows[p] > 0
+      ? (data.totalScored[p] / data.totalThrows[p] * 3).toFixed(1) : '—';
     const first3 = v.slice(0,3);
     const first9avg = first3.length > 0
       ? (first3.reduce((a,b)=>a+b,0) / first3.length).toFixed(1) : '—';
@@ -798,14 +937,14 @@ function showStats() {
     const c60p  = v.filter(s=>s>=60&&s<100).length;
     const c100p = v.filter(s=>s>=100&&s<140).length;
     const c140p = v.filter(s=>s>=140).length;
-    const co = game.checkoutAttempts[p], ch = game.checkoutHits[p];
+    const co = data.checkoutAttempts[p], ch = data.checkoutHits[p];
     const coStr = co > 0 ? `${ch}/${co} (${Math.round(ch/co*100)}%)` : '—';
     return { avg, first9avg, best,
       c60m, p60m:pct(c60m), c60p, p60p:pct(c60p),
       c100p, p100p:pct(c100p), c140p, p140p:pct(c140p), coStr };
   });
   const [s0,s1] = stats;
-  document.getElementById('stats-content').innerHTML = `
+  return `
     <div class="stats-names-row">
       <div class="stats-player-name">${escHtml(session.names[0])}</div>
       <div class="stats-player-name">${escHtml(session.names[1])}</div>
@@ -830,20 +969,13 @@ function showStats() {
     <div class="stats-heatmaps">
       <div class="stats-heatmap">
         <div class="stats-heatmap-name">${escHtml(session.names[0])}</div>
-        ${buildHeatmapSVG(game.dartHits[0])}
+        ${buildHeatmapSVG(data.dartHits[0])}
       </div>
       <div class="stats-heatmap">
         <div class="stats-heatmap-name">${escHtml(session.names[1])}</div>
-        ${buildHeatmapSVG(game.dartHits[1])}
+        ${buildHeatmapSVG(data.dartHits[1])}
       </div>
     </div>`;
-  document.getElementById('screen-gameover').style.display = 'none';
-  document.getElementById('screen-stats').style.display = 'flex';
-}
-
-function hideStats() {
-  document.getElementById('screen-stats').style.display = 'none';
-  document.getElementById('screen-gameover').style.display = 'flex';
 }
 
 function buildHeatmapSVG(hits) {
