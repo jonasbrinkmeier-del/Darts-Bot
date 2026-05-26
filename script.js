@@ -620,14 +620,18 @@ function undoFromGameover() {
   botState.rethrowPending = false;
   const who = game.turn;
 
+  // Gesamte Visit erfassen VOR dem Pop (endTurn hatte die volle Visit gezählt)
+  const visitTotal = game.dartScores.reduce((a,b) => a+b.score, 0);
+  const visitDarts = game.dartsThrown;
+
   // Letzten Dart entfernen
   const lastDart = game.dartScores.pop();
   game.dartsThrown--;
 
-  // Stats zurücksetzen
+  // Stats zurücksetzen — gesamte Visit rückgängig, nicht nur letzter Dart
   if (lastDart) {
-    game.totalThrows[who] = Math.max(0, game.totalThrows[who] - 1);
-    game.totalScored[who] = Math.max(0, game.totalScored[who] - lastDart.score);
+    game.totalThrows[who] = Math.max(0, game.totalThrows[who] - visitDarts);
+    game.totalScored[who] = Math.max(0, game.totalScored[who] - visitTotal);
     updateAvg(who);
     if (lastDart.number > 0) {
       const h = game.dartHits[who];
