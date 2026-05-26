@@ -117,6 +117,10 @@ let session = {
 // ── BOT STATE ─────────────────────────────────────────────
 let botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
 
+// ── VISIT HISTORY (für visit-übergreifendes Undo) ─────────
+let visitHistory = [];
+let botVisitRestored = false; // verhindert Bot-Rethrow nach Undo einer Bot-Visit
+
 // ── GAME ID — verhindert alte Bot-Timeouts nach Neustart ──
 // Jedes neue Spiel bekommt eine neue ID. Bot-Timeouts prüfen
 // ob ihre ID noch aktuell ist bevor sie ausführen.
@@ -321,6 +325,8 @@ function startLeg(startPlayer) {
   game.legCheckoutHits = [0, 0];
 
   botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
+  visitHistory = [];
+  botVisitRestored = false;
 
   document.getElementById('score-p1').textContent = '501';
   document.getElementById('score-p2').textContent = '501';
@@ -431,9 +437,121 @@ function registerDart(number, multiplier, score, label) {
   }
 }
 
+// ── UNDO ABGESCHLOSSENE VISIT ─────────────────────────────
+function undoLastVisit() {
+  if (visitHistory.length === 0) return;
+
+  cancelPendingEndTurn();
+  cancelPendingBotThrow();
+
+  const entry = visitHistory.pop();
+  const who = entry.who;
+
+  // dartHits und checkoutAttempts für alle Darts der Visit rückgängig
+  for (const dart of entry.darts) {
+    if (dart.number > 0) {
+      const h = game.dartHits[who];
+      if (h[dart.label]) { h[dart.label]--; if (!h[dart.label]) delete h[dart.label]; }
+      const lh = game.legDartHits[who];
+      if (lh[dart.label]) { lh[dart.label]--; if (!lh[dart.label]) delete lh[dart.label]; }
+    }
+    if (dart.isCheckoutAttempt) {
+      game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
+      game.legCheckoutAttempts[who] = Math.max(0, game.legCheckoutAttempts[who] - 1);
+    }
+  }
+
+  // totalScored / totalThrows auf Vor-Visit-Zustand zurücksetzen
+  game.totalScored[who] = entry.totalScoredBefore;
+  game.totalThrows[who] = entry.totalThrowsBefore;
+  game.legTotalScored[who] = entry.legTotalScoredBefore;
+  game.legTotalThrows[who] = entry.legTotalThrowsBefore;
+
+  // Letzten visits-Eintrag entfernen
+  if (game.visits[who].length > 0) game.visits[who].pop();
+  if (game.legVisits[who].length > 0) game.legVisits[who].pop();
+
+  // Score und Turn-State wiederherstellen
+  game.scores[who] = entry.scoreBefore;
+  game.scoreAtTurnStart = entry.scoreBefore;
+  game.dartScores = entry.darts.slice();
+  game.dartsThrown = entry.darts.length;
+  game.turn = who;
+  game.pendingMultiplier = 1;
+  game.inputLocked = false;
+
+  // Score-Anzeige aktualisieren
+  const scoreId = who === 0 ? 'score-p1' : 'score-p2';
+  if (entry.bust) {
+    document.getElementById(scoreId).textContent = entry.scoreBefore;
+  } else {
+    updateLiveScore();
+  }
+
+  // Turn-Indikatoren
+  document.getElementById('block-p1').classList.toggle('active', who === 0);
+  document.getElementById('block-p2').classList.toggle('active', who === 1);
+  const isBot = session.isBot[who];
+  document.getElementById('turn-text').textContent = isBot
+    ? session.names[who] + ' is throwing…'
+    : session.names[who] + ' — pick a number';
+
+  // Dart-Slots mit alten Darts befüllen
+  ['dart-1','dart-2','dart-3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (i < entry.darts.length) {
+      const d = entry.darts[i];
+      el.innerHTML = `<span>${d.label}</span><span class="slot-label">${d.score}</span>`;
+      el.classList.add('filled');
+      el.classList.remove('active-slot');
+      if (entry.bust && i === entry.darts.length - 1) {
+        el.style.borderColor = '#c0392b';
+        el.style.color = '#c0392b';
+      } else {
+        el.style.borderColor = '';
+        el.style.color = '';
+      }
+    } else {
+      el.innerHTML = '—';
+      el.classList.remove('filled', 'active-slot');
+      el.style.borderColor = '';
+      el.style.color = '';
+    }
+  });
+
+  // Last-Visit-Anzeige des Spielers leeren (vorherige Darts unbekannt)
+  const dartsEl = document.getElementById('visit-darts-p' + (who + 1));
+  const scoreEl = document.getElementById('visit-score-p' + (who + 1));
+  if (dartsEl) dartsEl.textContent = '';
+  if (scoreEl) scoreEl.textContent = '';
+
+  updateMultiplierUI();
+  updateActiveSlot();
+  updateCheckout();
+  updateAvg(who);
+  updateLiveAvg(who);
+
+  if (isBot) {
+    // Kein neuer Bot-Wurf - stattdessen Timer damit Spieler ⌫ drücken oder abwarten kann
+    botVisitRestored = true;
+    scheduleEndTurn(entry.bust, 1500);
+  }
+}
+
 // ── UNDO ──────────────────────────────────────────────────
 function clearEntry() {
-  if (game.dartsThrown === 0) return;
+  // Sonderfall: Bot-Visit wurde gerade wiederhergestellt → nochmal ⌫ geht eine Visit weiter zurück
+  if (botVisitRestored) {
+    botVisitRestored = false;
+    cancelPendingEndTurn();
+    cancelPendingBotThrow();
+    undoLastVisit();
+    return;
+  }
+  if (game.dartsThrown === 0) {
+    undoLastVisit();
+    return;
+  }
   cancelPendingEndTurn();
   cancelPendingBotThrow();
   undoLastDart();
@@ -489,9 +607,23 @@ function updateLastVisit(who, darts) {
 
 // ── END TURN ──────────────────────────────────────────────
 function endTurn(bust) {
+  botVisitRestored = false;
   botState.rethrowPending = false;
   pendingEndTurnId = null;
   const who = game.turn;
+
+  // Snapshot vor den Stat-Änderungen (für visit-übergreifendes Undo)
+  const visitSnapshot = {
+    who,
+    darts: game.dartScores.map(d => ({...d})),
+    scoreBefore: game.scoreAtTurnStart,
+    bust,
+    totalScoredBefore: game.totalScored[who],
+    totalThrowsBefore: game.totalThrows[who],
+    legTotalScoredBefore: game.legTotalScored[who],
+    legTotalThrowsBefore: game.legTotalThrows[who]
+  };
+
   if (bust) {
     game.totalThrows[who] += game.dartsThrown;
     game.legTotalThrows[who] += game.dartsThrown;
@@ -521,8 +653,9 @@ function endTurn(bust) {
     game.checkoutHits[who]++;
     game.legCheckoutHits[who]++;
     endGame(who);
-    return;
+    return; // Gewinn-Visit nicht in visitHistory (undoFromGameover kümmert sich darum)
   }
+  visitHistory.push(visitSnapshot);
   resetTurn();
   switchTurn(1 - who);
 }
