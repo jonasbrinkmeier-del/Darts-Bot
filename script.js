@@ -303,11 +303,9 @@ function toggleRandomStarter() {
   session.randomStarter = !session.randomStarter;
   const randomBtn = document.getElementById('random-starter-btn');
   if (randomBtn) randomBtn.classList.toggle('active', session.randomStarter);
-  const n = session.mode === 'local' ? session.multiNumPlayers : 2;
-  for (let i = 0; i < n; i++) {
-    const btn = document.getElementById('starter-btn-' + i);
-    if (btn) btn.disabled = session.randomStarter;
-  }
+  document.querySelectorAll('#starter-group .format-btn').forEach(btn => {
+    btn.disabled = session.randomStarter;
+  });
 }
 
 function setPlayerCount(n) {
@@ -336,8 +334,8 @@ function setPlayerCount(n) {
 function setFormat(type, value) {
   session.format = type;
   session.formatValue = value;
-  document.querySelectorAll('.format-btn').forEach(btn => btn.classList.remove('active'));
-  const btn = document.querySelector(`.format-btn[data-type="${type}"][data-value="${value}"]`);
+  document.querySelectorAll('#setup-block-format .format-btn').forEach(btn => btn.classList.remove('active'));
+  const btn = document.querySelector(`#setup-block-format .format-btn[data-type="${type}"][data-value="${value}"]`);
   if (btn) btn.classList.add('active');
 }
 
@@ -372,6 +370,7 @@ function showModeSetup(mode) {
   session.randomStarter = false;
   const randomBtn = document.getElementById('random-starter-btn');
   if (randomBtn) randomBtn.classList.remove('active');
+  document.querySelectorAll('#starter-group .format-btn').forEach(btn => { btn.disabled = false; });
 
   if (mode === 'local') {
     p2block.style.display = 'none';
@@ -1221,7 +1220,8 @@ function endGame(who) {
     document.getElementById('turn-text').textContent = scoreText;
     document.getElementById('turn-bar').style.background = '#1a3a1a';
     document.getElementById('turn-bar').style.color = '#7ec87e';
-    setTimeout(() => {
+    pendingEndTurnId = setTimeout(() => {
+      pendingEndTurnId = null;
       if (capturedId !== gameId) return;
       startLeg(nextStarter);
     }, 1800);
@@ -1305,7 +1305,8 @@ function undoFromGameover() {
     const currentGameId = gameId;
     botState.rethrowPending = true;
     botState.rethrowIndex = dartIndex;
-    setTimeout(() => {
+    pendingBotId = setTimeout(() => {
+      pendingBotId = null;
       if (currentGameId !== gameId) return;
       if (!botState.rethrowPending) return;
       if (game.dartsThrown !== botState.rethrowIndex) return;
