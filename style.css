@@ -58,12 +58,17 @@ body {
   font-size:13px; cursor:default; display:flex; justify-content:space-between; align-items:center;
 }
 .coming-soon { font-size:10px; background:#2a2a1a; color:#666; padding:2px 8px; border-radius:3px; letter-spacing:.05em; }
-.bot-profile-box {
-  background:#111; border:1px solid #2e2e2e; border-radius:6px;
-  padding:.75rem 1rem; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;
+.bot-profile-group { display:flex; gap:8px; width:100%; }
+.bot-profile-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:.65rem .5rem; background:#111; border:1px solid #2a2a2a;
+  border-radius:8px; cursor:pointer; transition:border-color .15s,background .15s;
 }
-.bot-profile-name { font-family:'Bebas Neue',sans-serif; font-size:18px; color:#c8a84b; }
+.bot-profile-btn.active { background:#1e1800; border-color:#c8a84b; }
+.bot-profile-name { font-family:'Bebas Neue',sans-serif; font-size:18px; color:#888; letter-spacing:.08em; }
+.bot-profile-btn.active .bot-profile-name { color:#c8a84b; }
 .bot-profile-avg { font-size:11px; color:#555; }
+.bot-profile-btn.active .bot-profile-avg { color:#a07830; }
 #start-btn {
   margin:1.5rem; padding:1rem; background:#c8a84b; color:#111; border:none;
   border-radius:8px; font-family:'Bebas Neue',sans-serif; font-size:22px;

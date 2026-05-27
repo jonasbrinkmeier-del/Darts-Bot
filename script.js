@@ -65,6 +65,39 @@ for (let s = 171; s <= 501; s++) {
 
 // ── BOT PROFILES ──────────────────────────────────────────
 const BOT_PROFILES = {
+  'Beginner': {
+    targetAvg: 40,
+    doublePhases: {
+      cold:   { accuracy:0.08, weight:0.35 },
+      normal: { accuracy:0.14, weight:0.45 },
+      hot:    { accuracy:0.24, weight:0.20 }
+    },
+    phaseTransitions: {
+      cold:   { hit:{cold:0.50,normal:0.40,hot:0.10}, miss:{cold:0.70,normal:0.25,hot:0.05} },
+      normal: { hit:{cold:0.25,normal:0.55,hot:0.20}, miss:{cold:0.50,normal:0.42,hot:0.08} },
+      hot:    { hit:{cold:0.15,normal:0.50,hot:0.35}, miss:{cold:0.30,normal:0.50,hot:0.20} }
+    },
+    t20Distribution: [
+      { label:'T20', number:20, multiplier:3, score:60, prob:0.18 },
+      { label:'S20', number:20, multiplier:1, score:20, prob:0.26 },
+      { label:'T5',  number:5,  multiplier:3, score:15, prob:0.10 },
+      { label:'T1',  number:1,  multiplier:3, score:3,  prob:0.12 },
+      { label:'S5',  number:5,  multiplier:1, score:5,  prob:0.13 },
+      { label:'S1',  number:1,  multiplier:1, score:1,  prob:0.12 },
+      { label:'D20', number:20, multiplier:2, score:40, prob:0.02 },
+      { label:'Miss',number:0,  multiplier:0, score:0,  prob:0.07 }
+    ],
+    t19Distribution: [
+      { label:'T19', number:19, multiplier:3, score:57, prob:0.18 },
+      { label:'S19', number:19, multiplier:1, score:19, prob:0.26 },
+      { label:'T7',  number:7,  multiplier:3, score:21, prob:0.10 },
+      { label:'T3',  number:3,  multiplier:3, score:9,  prob:0.12 },
+      { label:'S7',  number:7,  multiplier:1, score:7,  prob:0.13 },
+      { label:'S3',  number:3,  multiplier:1, score:3,  prob:0.12 },
+      { label:'D19', number:19, multiplier:2, score:38, prob:0.02 },
+      { label:'Miss',number:0,  multiplier:0, score:0,  prob:0.07 }
+    ]
+  },
   'Club Player': {
     targetAvg: 70,
     doublePhases: {
@@ -112,7 +145,7 @@ let session = {
   mode:null, names:['',''], isBot:[false,false],
   format:'firstTo', formatValue:1, legsToWin:1,
   legsWon:[0,0], legStartPlayer:0, startingPlayer:0,
-  multiNumPlayers:2, randomStarter:false
+  multiNumPlayers:2, randomStarter:false, botProfile:'Club Player'
 };
 
 function isMultiLayout() {
@@ -242,7 +275,15 @@ function updateStarterButtons() {
   }
   const p1 = document.getElementById('input-p1').value.trim() || 'Player 1';
   document.getElementById('starter-btn-0').textContent = p1;
-  document.getElementById('starter-btn-1').textContent = 'Club Player';
+  document.getElementById('starter-btn-1').textContent = session.botProfile || 'Club Player';
+}
+
+function selectBotProfile(name) {
+  session.botProfile = name;
+  document.querySelectorAll('.bot-profile-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.profile === name);
+  });
+  updateStarterButtons();
 }
 
 function rebuildStarterButtons(n) {
@@ -346,15 +387,18 @@ function showModeSetup(mode) {
     const p2label = document.getElementById('setup-p2-label');
     const p2options = document.getElementById('setup-p2-options');
     p2label.textContent = 'OPPONENT (BOT)';
+    session.botProfile = session.botProfile || 'Club Player';
     p2options.innerHTML = `
-      <div class="bot-profile-box">
-        <span class="bot-profile-name">Club Player</span>
-        <span class="bot-profile-avg">~70 avg</span>
-      </div>
-      <button class="saved-btn disabled">
-        <span>More bot profiles</span>
-        <span class="coming-soon">Coming soon</span>
-      </button>`;
+      <div class="bot-profile-group">
+        <button class="bot-profile-btn${session.botProfile === 'Beginner' ? ' active' : ''}" data-profile="Beginner" onclick="selectBotProfile('Beginner')">
+          <span class="bot-profile-name">Beginner</span>
+          <span class="bot-profile-avg">~40 avg</span>
+        </button>
+        <button class="bot-profile-btn${session.botProfile === 'Club Player' ? ' active' : ''}" data-profile="Club Player" onclick="selectBotProfile('Club Player')">
+          <span class="bot-profile-name">Club Player</span>
+          <span class="bot-profile-avg">~70 avg</span>
+        </button>
+      </div>`;
     setStarter(0);
     updateStarterButtons();
   }
@@ -364,7 +408,7 @@ function startGame() {
   if (session.mode !== 'bot') { startGameLocal(); return; }
 
   const p1name = document.getElementById('input-p1').value.trim() || 'Player 1';
-  const p2name = 'Club Player';
+  const p2name = session.botProfile || 'Club Player';
   session.isBot = [false,true];
   session.names = [p1name, p2name];
   session.legsToWin = session.format === 'firstTo'
@@ -725,7 +769,7 @@ function clearEntry() {
     pendingBotId = setTimeout(() => {
       pendingBotId = null;
       if (capturedId !== gameId) return;
-      throwBotDart(BOT_PROFILES['Club Player'], dartIndex, false);
+      throwBotDart(BOT_PROFILES[session.botProfile] || BOT_PROFILES['Club Player'], dartIndex, false);
     }, 2500);
   }
 }
@@ -956,7 +1000,7 @@ function getBotScoringZone(profile, remaining, dartsLeft, alreadySwitchedToT19) 
 
 // ── BOT HAUPTSEQUENZ ──────────────────────────────────────
 function botThrowSequence() {
-  throwBotDart(BOT_PROFILES['Club Player'], 0, false);
+  throwBotDart(BOT_PROFILES[session.botProfile] || BOT_PROFILES['Club Player'], 0, false);
 }
 
 function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
@@ -967,7 +1011,8 @@ function throwBotDart(profile, dartIndex, alreadySwitchedToT19) {
   let t19Dist = profile.t19Distribution;
   if (game.totalThrows[game.turn] > 9) {
     const currentAvg = (game.totalScored[game.turn] / game.totalThrows[game.turn]) * 3;
-    const rawAdj = currentAvg > 82 ? -0.04 : currentAvg < 56 ? 0.04 : 0;
+    const hi = profile.targetAvg * 1.17, lo = profile.targetAvg * 0.80;
+    const rawAdj = currentAvg > hi ? -0.04 : currentAvg < lo ? 0.04 : 0;
     if (rawAdj !== 0) {
       const adj = Math.sign(rawAdj) * Math.min(Math.abs(rawAdj), 0.06);
       const nudge = (dist, heroLabel) => dist.map(e => {
@@ -1265,7 +1310,7 @@ function undoFromGameover() {
       if (!botState.rethrowPending) return;
       if (game.dartsThrown !== botState.rethrowIndex) return;
       botState.rethrowPending = false;
-      throwBotDart(BOT_PROFILES['Club Player'], dartIndex, false);
+      throwBotDart(BOT_PROFILES[session.botProfile] || BOT_PROFILES['Club Player'], dartIndex, false);
     }, 2520);
   }
 }
