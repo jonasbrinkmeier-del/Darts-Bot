@@ -112,7 +112,7 @@ let session = {
   mode:null, names:['',''], isBot:[false,false],
   format:'firstTo', formatValue:1, legsToWin:1,
   legsWon:[0,0], legStartPlayer:0, startingPlayer:0,
-  multiNumPlayers:2
+  multiNumPlayers:2, randomStarter:false
 };
 
 function isMultiLayout() {
@@ -252,9 +252,21 @@ function rebuildStarterButtons(n) {
     const name = i === 0
       ? (document.getElementById('input-p1').value.trim() || 'Player 1')
       : (document.getElementById('input-mp-' + (i+1))?.value.trim() || 'Player ' + (i+1));
-    html += `<button class="format-btn${session.startingPlayer === i ? ' active' : ''}" id="starter-btn-${i}" onclick="setStarter(${i})">${escHtml(name)}</button>`;
+    const dis = session.randomStarter ? ' disabled' : '';
+    html += `<button class="format-btn${session.startingPlayer === i ? ' active' : ''}" id="starter-btn-${i}" onclick="setStarter(${i})"${dis}>${escHtml(name)}</button>`;
   }
   group.innerHTML = html;
+}
+
+function toggleRandomStarter() {
+  session.randomStarter = !session.randomStarter;
+  const randomBtn = document.getElementById('random-starter-btn');
+  if (randomBtn) randomBtn.classList.toggle('active', session.randomStarter);
+  const n = session.mode === 'local' ? session.multiNumPlayers : 2;
+  for (let i = 0; i < n; i++) {
+    const btn = document.getElementById('starter-btn-' + i);
+    if (btn) btn.disabled = session.randomStarter;
+  }
 }
 
 function setPlayerCount(n) {
@@ -315,6 +327,10 @@ function showModeSetup(mode) {
   const p2block = document.getElementById('setup-block-p2');
   const multiCountBlock = document.getElementById('setup-block-multi-count');
   const multiNamesBlock = document.getElementById('setup-block-multi-names');
+
+  session.randomStarter = false;
+  const randomBtn = document.getElementById('random-starter-btn');
+  if (randomBtn) randomBtn.classList.remove('active');
 
   if (mode === 'local') {
     p2block.style.display = 'none';
@@ -388,7 +404,8 @@ function startGame() {
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
 
-  startLeg(session.startingPlayer);
+  const starter = session.randomStarter ? Math.floor(Math.random() * 2) : session.startingPlayer;
+  startLeg(starter);
 }
 
 function startGameLocal() {
@@ -438,7 +455,8 @@ function startGameLocal() {
   document.getElementById('screen-setup').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
 
-  startLeg(session.startingPlayer);
+  const starter = session.randomStarter ? Math.floor(Math.random() * n) : session.startingPlayer;
+  startLeg(starter);
 }
 
 function startLeg(startPlayer) {
@@ -1472,4 +1490,4 @@ function shakeCurrent() {
 }
 
 // ── START ─────────────────────────────────────────────────
-showMenu();
+showMenu();can 
