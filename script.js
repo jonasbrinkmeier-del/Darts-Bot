@@ -637,95 +637,39 @@ function registerDart(number, multiplier, score, label) {
 
 // ── UNDO ABGESCHLOSSENE VISIT ─────────────────────────────
 function undoLastVisit() {
-  if (visitHistory.length === 0) return;
+  // Need current (unplayed) snapshot + at least one previous visit snapshot
+  if (visitHistory.length < 2) return;
 
   cancelPendingEndTurn();
   cancelPendingBotThrow();
 
-  const entry = visitHistory.pop();
-  const who = entry.who;
+  visitHistory.pop(); // discard unused current-turn snapshot
+  const snap = visitHistory.pop(); // restore previous visit's start state
+  game = snap.game;
+  visitHistory.push(snap); // push back so next undo works correctly
 
-  // dartHits und checkoutAttempts für alle Darts der Visit rückgängig
-  for (const dart of entry.darts) {
-    if (dart.number > 0) {
-      const h = game.dartHits[who];
-      if (h[dart.label]) { h[dart.label]--; if (!h[dart.label]) delete h[dart.label]; }
-      const lh = game.legDartHits[who];
-      if (lh[dart.label]) { lh[dart.label]--; if (!lh[dart.label]) delete lh[dart.label]; }
-    }
-    if (dart.isCheckoutAttempt) {
-      game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
-      game.legCheckoutAttempts[who] = Math.max(0, game.legCheckoutAttempts[who] - 1);
-    }
-  }
-
-  // totalScored / totalThrows auf Vor-Visit-Zustand zurücksetzen
-  game.totalScored[who] = entry.totalScoredBefore;
-  game.totalThrows[who] = entry.totalThrowsBefore;
-  game.legTotalScored[who] = entry.legTotalScoredBefore;
-  game.legTotalThrows[who] = entry.legTotalThrowsBefore;
-
-  // Letzten visits-Eintrag entfernen
-  if (game.visits[who].length > 0) game.visits[who].pop();
-  if (game.legVisits[who].length > 0) game.legVisits[who].pop();
-
-  // Score und Turn-State wiederherstellen
-  game.scores[who] = entry.scoreBefore;
-  game.scoreAtTurnStart = entry.scoreBefore;
-  game.dartScores = entry.darts.slice();
-  game.dartsThrown = entry.darts.length;
-  game.turn = who;
-  game.pendingMultiplier = 1;
-  game.inputLocked = false;
-
+  const who = game.turn;
   const isBot = session.isBot[who] || false;
 
-  // Score-Anzeige + Turn-Indikatoren
+  ['dart-1','dart-2','dart-3'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '—';
+    el.classList.remove('filled', 'active-slot');
+    el.style.borderColor = '';
+    el.style.color = '';
+  });
+
   if (isMultiLayout()) {
-    if (game.lastVisitLabels) game.lastVisitLabels[who] = '';
-    if (game.lastVisitTotals) delete game.lastVisitTotals[who];
     renderMultiScoreboard();
-    if (!entry.bust) updateLiveScore();
     document.getElementById('turn-text').textContent = session.names[who] + ' — pick a number';
   } else {
     const scoreId = who === 0 ? 'score-p1' : 'score-p2';
-    if (entry.bust) {
-      document.getElementById(scoreId).textContent = entry.scoreBefore;
-    } else {
-      updateLiveScore();
-    }
+    document.getElementById(scoreId).textContent = game.scores[who];
     document.getElementById('block-p1').classList.toggle('active', who === 0);
     document.getElementById('block-p2').classList.toggle('active', who === 1);
     document.getElementById('turn-text').textContent = isBot
       ? session.names[who] + ' is throwing…'
       : session.names[who] + ' — pick a number';
-  }
-
-  // Dart-Slots mit alten Darts befüllen
-  ['dart-1','dart-2','dart-3'].forEach((id, i) => {
-    const el = document.getElementById(id);
-    if (i < entry.darts.length) {
-      const d = entry.darts[i];
-      el.innerHTML = `<span>${d.label}</span><span class="slot-label">${d.score}</span>`;
-      el.classList.add('filled');
-      el.classList.remove('active-slot');
-      if (entry.bust && i === entry.darts.length - 1) {
-        el.style.borderColor = '#c0392b';
-        el.style.color = '#c0392b';
-      } else {
-        el.style.borderColor = '';
-        el.style.color = '';
-      }
-    } else {
-      el.innerHTML = '—';
-      el.classList.remove('filled', 'active-slot');
-      el.style.borderColor = '';
-      el.style.color = '';
-    }
-  });
-
-  // Last-Visit-Anzeige leeren (nur für 1v1/bot)
-  if (!isMultiLayout()) {
     const dartsEl = document.getElementById('visit-darts-p' + (who + 1));
     const scoreEl = document.getElementById('visit-score-p' + (who + 1));
     if (dartsEl) dartsEl.textContent = '';
@@ -739,9 +683,15 @@ function undoLastVisit() {
   updateLiveAvg(who);
 
   if (isBot) {
-    // Kein neuer Bot-Wurf - stattdessen Timer damit Spieler ⌫ drücken oder abwarten kann
     botVisitRestored = true;
-    scheduleEndTurn(entry.bust, 1500);
+    const currentGameId = gameId;
+    pendingBotId = setTimeout(() => {
+      pendingBotId = null;
+      if (currentGameId !== gameId) return;
+      if (!botVisitRestored) return;
+      botVisitRestored = false;
+      botThrowSequence();
+    }, 1500);
   }
 }
 
@@ -832,18 +782,6 @@ function endTurn(bust) {
   pendingEndTurnId = null;
   const who = game.turn;
 
-  // Snapshot vor den Stat-Änderungen (für visit-übergreifendes Undo)
-  const visitSnapshot = {
-    who,
-    darts: game.dartScores.map(d => ({...d})),
-    scoreBefore: game.scoreAtTurnStart,
-    bust,
-    totalScoredBefore: game.totalScored[who],
-    totalThrowsBefore: game.totalThrows[who],
-    legTotalScoredBefore: game.legTotalScored[who],
-    legTotalThrowsBefore: game.legTotalThrows[who]
-  };
-
   if (bust) {
     game.totalThrows[who] += game.dartsThrown;
     game.legTotalThrows[who] += game.dartsThrown;
@@ -879,7 +817,6 @@ function endTurn(bust) {
     endGame(who);
     return;
   }
-  visitHistory.push(visitSnapshot);
   resetTurn();
   const nextPlayer = isMultiLayout()
     ? (who + 1) % session.names.length
@@ -937,6 +874,7 @@ function renderMultiScoreboard() {
 function switchTurn(who) {
   game.turn = who;
   game.scoreAtTurnStart = game.scores[who];
+  visitHistory.push({ game: structuredClone(game), turn: who });
 
   if (isMultiLayout()) {
     renderMultiScoreboard();
@@ -1234,84 +1172,63 @@ function undoFromGameover() {
   cancelPendingBotThrow();
   botState.rethrowPending = false;
   botVisitRestored = false;
+
   const who = game.turn;
 
-  const visitTotal = game.dartScores.reduce((a,b) => a+b.score, 0);
-  const visitDarts = game.dartsThrown;
-
-  const lastDart = game.dartScores.pop();
-  game.dartsThrown--;
-
-  if (lastDart) {
-    game.totalThrows[who] = Math.max(0, game.totalThrows[who] - visitDarts);
-    game.totalScored[who] = Math.max(0, game.totalScored[who] - visitTotal);
-    updateAvg(who);
-    const h = game.dartHits[who];
-    [...game.dartScores, lastDart].forEach(d => {
-      if (d && d.number > 0 && h[d.label]) { h[d.label]--; if (!h[d.label]) delete h[d.label]; }
-    });
-    game.legTotalThrows[who] = Math.max(0, game.legTotalThrows[who] - visitDarts);
-    game.legTotalScored[who] = Math.max(0, game.legTotalScored[who] - visitTotal);
-    const lh = game.legDartHits[who];
-    [...game.dartScores, lastDart].forEach(d => {
-      if (d && d.number > 0 && lh[d.label]) { lh[d.label]--; if (!lh[d.label]) delete lh[d.label]; }
-    });
-    if (lastDart.isCheckoutAttempt) {
-      game.checkoutAttempts[who] = Math.max(0, game.checkoutAttempts[who] - 1);
-      game.legCheckoutAttempts[who] = Math.max(0, game.legCheckoutAttempts[who] - 1);
-    }
-  }
-  if (game.visits[who].length > 0) game.visits[who].pop();
-  if (game.legVisits[who].length > 0) game.legVisits[who].pop();
-  game.checkoutHits[who] = Math.max(0, game.checkoutHits[who] - 1);
-  game.legCheckoutHits[who] = Math.max(0, game.legCheckoutHits[who] - 1);
-  if (session.legStats.length > 0) session.legStats.pop();
+  // Roll back session-level state (not captured in game snapshot)
   session.legsWon[who] = Math.max(0, session.legsWon[who] - 1);
+  if (session.legStats.length > 0) session.legStats.pop();
 
-  game.scores[who] = game.scoreAtTurnStart;
-  game.inputLocked = false;
+  // Restore game from the snapshot taken at the start of who's winning turn
+  if (visitHistory.length === 0) return;
+  const snap = visitHistory.pop();
+  game = snap.game;
+  visitHistory.push(snap); // push back so subsequent undoLastVisit works correctly
 
-  const slot = document.getElementById('dart-' + (game.dartsThrown + 1));
-  slot.innerHTML = '—';
-  slot.classList.remove('filled');
-  slot.style.borderColor = '';
-  slot.style.color = '';
+  const restoredWho = game.turn;
+
+  ['dart-1','dart-2','dart-3'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '—';
+    el.classList.remove('filled', 'active-slot');
+    el.style.borderColor = '';
+    el.style.color = '';
+  });
 
   document.getElementById('screen-gameover').style.display = 'none';
   document.getElementById('screen-game').style.display = 'flex';
 
   if (isMultiLayout()) {
-    if (game.lastVisitLabels) game.lastVisitLabels[who] = '';
-    if (game.lastVisitTotals) delete game.lastVisitTotals[who];
+    if (game.lastVisitLabels) game.lastVisitLabels[restoredWho] = '';
+    if (game.lastVisitTotals) delete game.lastVisitTotals[restoredWho];
     updateLegCircles();
-    document.getElementById('turn-text').textContent = session.names[who] + ' — pick a number';
+    document.getElementById('turn-text').textContent = session.names[restoredWho] + ' — pick a number';
   } else {
     updateLegCircles();
-    const id = who === 0 ? 'score-p1' : 'score-p2';
-    document.getElementById(id).textContent = game.scoreAtTurnStart;
-    document.getElementById('block-p1').classList.toggle('active', who === 0);
-    document.getElementById('block-p2').classList.toggle('active', who === 1);
-    document.getElementById('turn-text').textContent = session.isBot[who]
-      ? session.names[who] + ' is throwing…'
-      : session.names[who] + ' — pick a number';
+    const id = restoredWho === 0 ? 'score-p1' : 'score-p2';
+    document.getElementById(id).textContent = game.scores[restoredWho];
+    document.getElementById('block-p1').classList.toggle('active', restoredWho === 0);
+    document.getElementById('block-p2').classList.toggle('active', restoredWho === 1);
+    document.getElementById('turn-text').textContent = session.isBot[restoredWho]
+      ? session.names[restoredWho] + ' is throwing…'
+      : session.names[restoredWho] + ' — pick a number';
   }
 
   updateLiveScore();
   updateCheckout();
   updateActiveSlot();
 
-  if (session.isBot[who]) {
-    const dartIndex = game.dartsThrown;
+  if (session.isBot[restoredWho]) {
     const currentGameId = gameId;
     botState.rethrowPending = true;
-    botState.rethrowIndex = dartIndex;
+    botState.rethrowIndex = 0;
     pendingBotId = setTimeout(() => {
       pendingBotId = null;
       if (currentGameId !== gameId) return;
       if (!botState.rethrowPending) return;
       if (game.dartsThrown !== botState.rethrowIndex) return;
       botState.rethrowPending = false;
-      throwBotDart(BOT_PROFILES[session.botProfile] || BOT_PROFILES['Club Player'], dartIndex, false);
+      throwBotDart(BOT_PROFILES[session.botProfile] || BOT_PROFILES['Club Player'], 0, false);
     }, 2520);
   }
 }
