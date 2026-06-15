@@ -596,7 +596,7 @@ function registerDart(number, multiplier, score, label) {
   }
   const _rb = game.scoreAtTurnStart - game.dartScores.slice(0,-1).reduce((a,b)=>a+b.score,0);
   if (_rb >= 2 && CHECKOUTS[_rb]) {
-    if (multiplier === 2 || label === 'Bull') {
+    if ((multiplier === 2 || label === 'Bull') && score === _rb) {
       dart.isCheckoutAttempt = true;
       game.checkoutAttempts[game.turn]++;
       game.legCheckoutAttempts[game.turn]++;
@@ -645,7 +645,7 @@ function undoLastVisit() {
 
   visitHistory.pop(); // discard unused current-turn snapshot
   const snap = visitHistory.pop(); // restore previous visit's start state
-  game = snap.game;
+  game = structuredClone(snap.game);
   visitHistory.push(snap); // push back so next undo works correctly
 
   const who = game.turn;
@@ -875,6 +875,7 @@ function switchTurn(who) {
   game.turn = who;
   game.scoreAtTurnStart = game.scores[who];
   visitHistory.push({ game: structuredClone(game), turn: who });
+  if (visitHistory.length > 3) visitHistory.splice(0, visitHistory.length - 3);
 
   if (isMultiLayout()) {
     renderMultiScoreboard();
@@ -1182,7 +1183,7 @@ function undoFromGameover() {
   // Restore game from the snapshot taken at the start of who's winning turn
   if (visitHistory.length === 0) return;
   const snap = visitHistory.pop();
-  game = snap.game;
+  game = structuredClone(snap.game);
   visitHistory.push(snap); // push back so subsequent undoLastVisit works correctly
 
   const restoredWho = game.turn;
