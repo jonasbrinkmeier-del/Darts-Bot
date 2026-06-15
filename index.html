@@ -4,9 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dart Bot</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
   <link rel="stylesheet" href="style.css">
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
-<script defer src="/_vercel/insights/script.js"></script>
 <body>
 
 <!-- SCREEN 1: START MENU -->
@@ -17,11 +18,11 @@
     <div id="menu-sub">choose your game</div>
   </div>
   <div id="menu-buttons">
-    <button class="menu-btn" onclick="showModeSetup('bot')">
+    <button type="button" class="menu-btn" onclick="showModeSetup('bot')">
       <span class="menu-btn-title">VS BOT</span>
       <span class="menu-btn-sub">Play against the AI</span>
     </button>
-    <button class="menu-btn" onclick="showModeSetup('local')">
+    <button type="button" class="menu-btn" onclick="showModeSetup('local')">
       <span class="menu-btn-title">LOCAL PLAY</span>
       <span class="menu-btn-sub">2–5 players, one device</span>
     </button>
@@ -31,16 +32,16 @@
 <!-- SCREEN 2: SETUP -->
 <div id="screen-setup" style="display:none">
   <div id="setup-header">
-    <button id="setup-back" onclick="showMenu()">← Back</button>
+    <button type="button" id="setup-back" onclick="showMenu()">← Back</button>
     <div id="setup-title">Game Setup</div>
   </div>
   <div class="setup-block">
     <div class="setup-label">PLAYER 1</div>
     <div class="setup-options">
       <div class="setup-input-row">
-        <input type="text" id="input-p1" placeholder="Enter name…" maxlength="12" oninput="updateStarterButtons()" />
+        <input type="text" id="input-p1" placeholder="Enter name…" maxlength="12" aria-label="Player 1 name" oninput="updateStarterButtons()" />
       </div>
-      <button class="saved-btn disabled">
+      <button type="button" class="saved-btn" disabled>
         <span>Saved players</span>
         <span class="coming-soon">Coming soon</span>
       </button>
@@ -53,10 +54,10 @@
   <div class="setup-block" id="setup-block-multi-count" style="display:none">
     <div class="setup-label">NUMBER OF PLAYERS</div>
     <div class="format-group">
-      <button class="format-btn mp-count-btn active" onclick="setPlayerCount(2)">2</button>
-      <button class="format-btn mp-count-btn" onclick="setPlayerCount(3)">3</button>
-      <button class="format-btn mp-count-btn" onclick="setPlayerCount(4)">4</button>
-      <button class="format-btn mp-count-btn" onclick="setPlayerCount(5)">5</button>
+      <button type="button" class="format-btn mp-count-btn active" onclick="setPlayerCount(2)">2</button>
+      <button type="button" class="format-btn mp-count-btn" onclick="setPlayerCount(3)">3</button>
+      <button type="button" class="format-btn mp-count-btn" onclick="setPlayerCount(4)">4</button>
+      <button type="button" class="format-btn mp-count-btn" onclick="setPlayerCount(5)">5</button>
     </div>
   </div>
   <div class="setup-block" id="setup-block-multi-names" style="display:none">
@@ -68,34 +69,34 @@
     <div class="format-section">
       <div class="format-cat-label">FIRST TO</div>
       <div class="format-group">
-        <button class="format-btn active" data-type="firstTo" data-value="1" onclick="setFormat('firstTo',1)">1</button>
-        <button class="format-btn" data-type="firstTo" data-value="2" onclick="setFormat('firstTo',2)">2</button>
-        <button class="format-btn" data-type="firstTo" data-value="3" onclick="setFormat('firstTo',3)">3</button>
-        <button class="format-btn" data-type="firstTo" data-value="4" onclick="setFormat('firstTo',4)">4</button>
-        <button class="format-btn" data-type="firstTo" data-value="5" onclick="setFormat('firstTo',5)">5</button>
-        <button class="format-btn" data-type="firstTo" data-value="6" onclick="setFormat('firstTo',6)">6</button>
-        <button class="format-btn" data-type="firstTo" data-value="10" onclick="setFormat('firstTo',10)">10</button>
+        <button type="button" class="format-btn active" data-type="firstTo" data-value="1" onclick="setFormat('firstTo',1)">1</button>
+        <button type="button" class="format-btn" data-type="firstTo" data-value="2" onclick="setFormat('firstTo',2)">2</button>
+        <button type="button" class="format-btn" data-type="firstTo" data-value="3" onclick="setFormat('firstTo',3)">3</button>
+        <button type="button" class="format-btn" data-type="firstTo" data-value="4" onclick="setFormat('firstTo',4)">4</button>
+        <button type="button" class="format-btn" data-type="firstTo" data-value="5" onclick="setFormat('firstTo',5)">5</button>
+        <button type="button" class="format-btn" data-type="firstTo" data-value="6" onclick="setFormat('firstTo',6)">6</button>
+        <button type="button" class="format-btn" data-type="firstTo" data-value="10" onclick="setFormat('firstTo',10)">10</button>
       </div>
     </div>
     <div class="format-section">
       <div class="format-cat-label">BEST OF</div>
       <div class="format-group">
-        <button class="format-btn" data-type="bestOf" data-value="3" onclick="setFormat('bestOf',3)">3</button>
-        <button class="format-btn" data-type="bestOf" data-value="5" onclick="setFormat('bestOf',5)">5</button>
-        <button class="format-btn" data-type="bestOf" data-value="9" onclick="setFormat('bestOf',9)">9</button>
-        <button class="format-btn" data-type="bestOf" data-value="11" onclick="setFormat('bestOf',11)">11</button>
+        <button type="button" class="format-btn" data-type="bestOf" data-value="3" onclick="setFormat('bestOf',3)">3</button>
+        <button type="button" class="format-btn" data-type="bestOf" data-value="5" onclick="setFormat('bestOf',5)">5</button>
+        <button type="button" class="format-btn" data-type="bestOf" data-value="9" onclick="setFormat('bestOf',9)">9</button>
+        <button type="button" class="format-btn" data-type="bestOf" data-value="11" onclick="setFormat('bestOf',11)">11</button>
       </div>
     </div>
   </div>
   <div class="setup-block" id="setup-block-starter">
     <div class="setup-label">WHO STARTS?</div>
     <div class="format-group" id="starter-group">
-      <button class="format-btn active" id="starter-btn-0" onclick="setStarter(0)">Player 1</button>
-      <button class="format-btn" id="starter-btn-1" onclick="setStarter(1)">Player 2</button>
+      <button type="button" class="format-btn active" id="starter-btn-0" onclick="setStarter(0)">Player 1</button>
+      <button type="button" class="format-btn" id="starter-btn-1" onclick="setStarter(1)">Player 2</button>
     </div>
-    <button class="random-starter-btn" id="random-starter-btn" onclick="toggleRandomStarter()">🎲 RANDOM</button>
+    <button type="button" class="random-starter-btn" id="random-starter-btn" onclick="toggleRandomStarter()">🎲 RANDOM</button>
   </div>
-  <button id="start-btn" onclick="startGame()">Start Game →</button>
+  <button type="button" id="start-btn" onclick="startGame()">Start Game →</button>
 </div>
 
 <!-- SCREEN 3: GAME -->
@@ -152,45 +153,45 @@
 
   <!-- MULTIPLIER BUTTONS -->
   <div id="multiplier-row">
-    <button class="mult-btn" id="btn-double" onclick="setMultiplier(2)">D</button>
-    <button class="mult-btn" id="btn-treble" onclick="setMultiplier(3)">T</button>
-    <button class="num-btn" id="btn-undo" onclick="clearEntry()">⌫</button>
+    <button type="button" class="mult-btn" id="btn-double" aria-label="Double" onclick="setMultiplier(2)">D</button>
+    <button type="button" class="mult-btn" id="btn-treble" aria-label="Treble" onclick="setMultiplier(3)">T</button>
+    <button type="button" class="num-btn" id="btn-undo" aria-label="Undo" onclick="clearEntry()">⌫</button>
   </div>
 
   <!-- NUMBER GRID -->
   <div id="numgrid">
-    <button class="num-btn" onclick="enterNumber(0)">0</button>
-    <button class="num-btn" onclick="enterNumber(1)">1</button>
-    <button class="num-btn" onclick="enterNumber(2)">2</button>
-    <button class="num-btn" onclick="enterNumber(3)">3</button>
-    <button class="num-btn" onclick="enterNumber(4)">4</button>
-    <button class="num-btn" onclick="enterNumber(5)">5</button>
-    <button class="num-btn" onclick="enterNumber(6)">6</button>
-    <button class="num-btn" onclick="enterNumber(7)">7</button>
-    <button class="num-btn" onclick="enterNumber(8)">8</button>
-    <button class="num-btn" onclick="enterNumber(9)">9</button>
-    <button class="num-btn" onclick="enterNumber(10)">10</button>
-    <button class="num-btn" onclick="enterNumber(11)">11</button>
-    <button class="num-btn" onclick="enterNumber(12)">12</button>
-    <button class="num-btn" onclick="enterNumber(13)">13</button>
-    <button class="num-btn" onclick="enterNumber(14)">14</button>
-    <button class="num-btn" onclick="enterNumber(15)">15</button>
-    <button class="num-btn" onclick="enterNumber(16)">16</button>
-    <button class="num-btn" onclick="enterNumber(17)">17</button>
-    <button class="num-btn" onclick="enterNumber(18)">18</button>
-    <button class="num-btn" onclick="enterNumber(19)">19</button>
-    <button class="num-btn" onclick="enterNumber(20)">20</button>
-    <button class="num-btn num-btn-bull" onclick="enterNumber(25)">25</button>
-    <button class="num-btn num-btn-menu" onclick="confirmMenu()">⌂</button>
+    <button type="button" class="num-btn" onclick="enterNumber(0)">0</button>
+    <button type="button" class="num-btn" onclick="enterNumber(1)">1</button>
+    <button type="button" class="num-btn" onclick="enterNumber(2)">2</button>
+    <button type="button" class="num-btn" onclick="enterNumber(3)">3</button>
+    <button type="button" class="num-btn" onclick="enterNumber(4)">4</button>
+    <button type="button" class="num-btn" onclick="enterNumber(5)">5</button>
+    <button type="button" class="num-btn" onclick="enterNumber(6)">6</button>
+    <button type="button" class="num-btn" onclick="enterNumber(7)">7</button>
+    <button type="button" class="num-btn" onclick="enterNumber(8)">8</button>
+    <button type="button" class="num-btn" onclick="enterNumber(9)">9</button>
+    <button type="button" class="num-btn" onclick="enterNumber(10)">10</button>
+    <button type="button" class="num-btn" onclick="enterNumber(11)">11</button>
+    <button type="button" class="num-btn" onclick="enterNumber(12)">12</button>
+    <button type="button" class="num-btn" onclick="enterNumber(13)">13</button>
+    <button type="button" class="num-btn" onclick="enterNumber(14)">14</button>
+    <button type="button" class="num-btn" onclick="enterNumber(15)">15</button>
+    <button type="button" class="num-btn" onclick="enterNumber(16)">16</button>
+    <button type="button" class="num-btn" onclick="enterNumber(17)">17</button>
+    <button type="button" class="num-btn" onclick="enterNumber(18)">18</button>
+    <button type="button" class="num-btn" onclick="enterNumber(19)">19</button>
+    <button type="button" class="num-btn" onclick="enterNumber(20)">20</button>
+    <button type="button" class="num-btn num-btn-bull" onclick="enterNumber(25)">25</button>
+    <button type="button" class="num-btn num-btn-menu" aria-label="Menu" onclick="confirmMenu()">⌂</button>
   </div>
 
-  <!-- BESTÄTIGUNGS-POPUP -->
+  <!-- CONFIRM POPUP -->
   <div id="menu-confirm" style="display:none">
     <div id="menu-confirm-box">
-      <div id="menu-confirm-text">Game verlassen?</div>
+      <div id="menu-confirm-text">Leave game?</div>
       <div id="menu-confirm-buttons">
-        <button class="confirm-btn confirm-no" onclick="closeConfirm()">Nein</button>
-        <button class="confirm-btn confirm-yes" onclick="showMenu()">Ja</button>
+        <button type="button" class="confirm-btn confirm-no" onclick="closeConfirm()">No</button>
+        <button type="button" class="confirm-btn confirm-yes" onclick="showMenu()">Yes</button>
       </div>
     </div>
   </div>
@@ -200,7 +201,7 @@
 <!-- SCREEN 5: STATS -->
 <div id="screen-stats" style="display:none">
   <div id="stats-header">
-    <button id="stats-back" onclick="hideStats()">← Back</button>
+    <button type="button" id="stats-back" onclick="hideStats()">← Back</button>
     <div id="stats-title">STATS</div>
   </div>
   <div id="stats-content"></div>
@@ -214,9 +215,9 @@
     <div id="gameover-name"></div>
     <div id="gameover-stats"></div>
     <div id="gameover-buttons">
-      <button class="gameover-btn" onclick="undoFromGameover()">↩ Undo</button>
-      <button class="gameover-btn" onclick="showMenu()">⌂ Menü</button>
-      <button class="gameover-btn gameover-btn-stats" onclick="showStats()">📊 Stats</button>
+      <button type="button" class="gameover-btn" onclick="undoFromGameover()">↩ Undo</button>
+      <button type="button" class="gameover-btn" onclick="showMenu()">⌂ Menu</button>
+      <button type="button" class="gameover-btn gameover-btn-stats" onclick="showStats()">📊 Stats</button>
     </div>
   </div>
 </div>

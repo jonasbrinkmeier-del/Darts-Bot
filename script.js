@@ -155,13 +155,12 @@ function isMultiLayout() {
 // ── BOT STATE ─────────────────────────────────────────────
 let botState = { doublePhase:'normal', rethrowPending:false, rethrowIndex:0 };
 
-// ── VISIT HISTORY (für visit-übergreifendes Undo) ─────────
+// ── VISIT HISTORY (cross-visit undo support) ──────────────
 let visitHistory = [];
-let botVisitRestored = false; // verhindert Bot-Rethrow nach Undo einer Bot-Visit
+let botVisitRestored = false; // prevents bot re-throw after undoing a bot visit
 
-// ── GAME ID — verhindert alte Bot-Timeouts nach Neustart ──
-// Jedes neue Spiel bekommt eine neue ID. Bot-Timeouts prüfen
-// ob ihre ID noch aktuell ist bevor sie ausführen.
+// ── GAME ID — prevents stale bot timeouts from firing after restart ──
+// Each new game gets a new ID. Bot timeouts check their ID before executing.
 let gameId = 0;
 let pendingEndTurnId = null;
 let pendingBotId = null;
@@ -171,7 +170,7 @@ let game = {
   scores:[501,501], turn:0, dartsThrown:0, dartScores:[],
   totalThrows:[0,0], totalScored:[0,0],
   pendingMultiplier:1, scoreAtTurnStart:501,
-  inputLocked:false  // Punkt 5: blockiert Input während Bust/Finish-Delay
+  inputLocked:false  // blocks input during bust/finish delay
 };
 
 // ── SHOW MENU ─────────────────────────────────────────────
@@ -294,7 +293,7 @@ function rebuildStarterButtons(n) {
       ? (document.getElementById('input-p1').value.trim() || 'Player 1')
       : (document.getElementById('input-mp-' + (i+1))?.value.trim() || 'Player ' + (i+1));
     const dis = session.randomStarter ? ' disabled' : '';
-    html += `<button class="format-btn${session.startingPlayer === i ? ' active' : ''}" id="starter-btn-${i}" onclick="setStarter(${i})"${dis}>${escHtml(name)}</button>`;
+    html += `<button type="button" class="format-btn${session.startingPlayer === i ? ' active' : ''}" id="starter-btn-${i}" onclick="setStarter(${i})"${dis}>${escHtml(name)}</button>`;
   }
   group.innerHTML = html;
 }
@@ -322,7 +321,7 @@ function setPlayerCount(n) {
   for (let i = 2; i <= 5; i++) {
     const val = escHtml(saved[i] || '');
     html += `<div class="setup-input-row" id="multi-name-row-${i}" style="${i > n ? 'display:none' : ''}">
-      <input type="text" id="input-mp-${i}" placeholder="Player ${i}" maxlength="12" value="${val}" oninput="updateStarterButtons()" />
+      <input type="text" id="input-mp-${i}" placeholder="Player ${i}" maxlength="12" aria-label="Player ${i} name" value="${val}" oninput="updateStarterButtons()" />
     </div>`;
   }
   document.getElementById('multi-name-rows').innerHTML = html;
@@ -389,11 +388,11 @@ function showModeSetup(mode) {
     session.botProfile = session.botProfile || 'Club Player';
     p2options.innerHTML = `
       <div class="bot-profile-group">
-        <button class="bot-profile-btn${session.botProfile === 'Beginner' ? ' active' : ''}" data-profile="Beginner" onclick="selectBotProfile('Beginner')">
+        <button type="button" class="bot-profile-btn${session.botProfile === 'Beginner' ? ' active' : ''}" data-profile="Beginner" onclick="selectBotProfile('Beginner')">
           <span class="bot-profile-name">Beginner</span>
           <span class="bot-profile-avg">~40 avg</span>
         </button>
-        <button class="bot-profile-btn${session.botProfile === 'Club Player' ? ' active' : ''}" data-profile="Club Player" onclick="selectBotProfile('Club Player')">
+        <button type="button" class="bot-profile-btn${session.botProfile === 'Club Player' ? ' active' : ''}" data-profile="Club Player" onclick="selectBotProfile('Club Player')">
           <span class="bot-profile-name">Club Player</span>
           <span class="bot-profile-avg">~70 avg</span>
         </button>
@@ -421,7 +420,6 @@ function startGame() {
   document.getElementById('block-p1').querySelector('.player-avg').textContent = 'Avg: —';
   document.getElementById('block-p2').querySelector('.player-avg').textContent = 'Avg: —';
 
-  const n = 2;
   game = {
     scores:[501,501], turn:0, dartsThrown:0, dartScores:[],
     totalThrows:[0,0], totalScored:[0,0],
@@ -568,7 +566,7 @@ function updateActiveSlot() {
   });
 }
 
-// ── ZAHL EINGEBEN ─────────────────────────────────────────
+// ── ENTER NUMBER ──────────────────────────────────────────
 function enterNumber(num) {
   if (game.inputLocked) return;
   if (session.isBot[game.turn]) return;
@@ -586,7 +584,7 @@ function enterNumber(num) {
   registerDart(num, mult, score, label);
 }
 
-// ── DART REGISTRIEREN ─────────────────────────────────────
+// ── REGISTER DART ─────────────────────────────────────────
 function registerDart(number, multiplier, score, label) {
   const dart = { number, multiplier, score, label, isCheckoutAttempt: false };
   game.dartScores.push(dart);
@@ -635,7 +633,7 @@ function registerDart(number, multiplier, score, label) {
   }
 }
 
-// ── UNDO ABGESCHLOSSENE VISIT ─────────────────────────────
+// ── UNDO COMPLETED VISIT ──────────────────────────────────
 function undoLastVisit() {
   // Need current (unplayed) snapshot + at least one previous visit snapshot
   if (visitHistory.length < 2) return;
@@ -697,7 +695,7 @@ function undoLastVisit() {
 
 // ── UNDO ──────────────────────────────────────────────────
 function clearEntry() {
-  // Sonderfall: Bot-Visit wurde gerade wiederhergestellt → nochmal ⌫ geht eine Visit weiter zurück
+  // Special case: bot visit just restored — pressing ⌫ again goes back one more visit
   if (botVisitRestored) {
     botVisitRestored = false;
     cancelPendingEndTurn();
@@ -909,7 +907,7 @@ function resetTurn() {
   game.dartsThrown = 0;
   game.dartScores = [];
   game.pendingMultiplier = 1;
-  game.inputLocked = false; // Punkt 5: Input freischalten
+  game.inputLocked = false; // unlock input
   ['dart-1','dart-2','dart-3'].forEach(id => {
     const el = document.getElementById(id);
     el.innerHTML = '—';
@@ -921,7 +919,7 @@ function resetTurn() {
   document.getElementById('checkout-bar').style.display = 'none';
 }
 
-// ── BOT ZIELZONE ──────────────────────────────────────────
+// ── BOT TARGET ZONE ───────────────────────────────────────
 function getBotScoringZone(profile, remaining, dartsLeft, alreadySwitchedToT19) {
   if (remaining <= 170 && remaining >= 2 && CHECKOUTS[remaining]) {
     const route = CHECKOUTS[remaining].filter(d => d !== null);
@@ -936,7 +934,7 @@ function getBotScoringZone(profile, remaining, dartsLeft, alreadySwitchedToT19) 
   return 't20';
 }
 
-// ── BOT HAUPTSEQUENZ ──────────────────────────────────────
+// ── BOT MAIN SEQUENCE ─────────────────────────────────────
 function botThrowSequence() {
   throwBotDart(BOT_PROFILES[session.botProfile] || BOT_PROFILES['Club Player'], 0, false);
 }
@@ -1079,12 +1077,12 @@ function updateDoublePhase(profile, hit) {
   }
 }
 
-// ── HILFSFUNKTIONEN ───────────────────────────────────────
+// ── HELPERS ───────────────────────────────────────────────
 function parseTarget(str) {
   if (str === 'Bull') return { number:25, multiplier:2 };
   if (str === '25')   return { number:25, multiplier:1 };
   const mult = str[0]==='T' ? 3 : str[0]==='D' ? 2 : 1;
-  const num  = parseInt(str.slice(1));
+  const num  = parseInt(str.slice(1), 10);
   return { number:num, multiplier:mult };
 }
 
@@ -1167,7 +1165,7 @@ function endGame(who) {
   }
 }
 
-// ── UNDO VOM GAME OVER ────────────────────────────────────
+// ── UNDO FROM GAME OVER ───────────────────────────────────
 function undoFromGameover() {
   cancelPendingEndTurn();
   cancelPendingBotThrow();
@@ -1297,12 +1295,12 @@ function buildStatsScreen() {
   const isMulti = isMultiLayout();
   const tabsHtml = tabs.length > 1
     ? '<div class="stats-tabs">' +
-      tabs.map((t, i) => `<button class="stats-tab${i === statsActiveTab ? ' active' : ''}" onclick="selectStatsTab(${i})">${escHtml(t.label)}</button>`).join('') +
+      tabs.map((t, i) => `<button type="button" class="stats-tab${i === statsActiveTab ? ' active' : ''}" onclick="selectStatsTab(${i})">${escHtml(t.label)}</button>`).join('') +
       '</div>'
     : '';
   const playerTabsHtml = isMulti
     ? '<div class="stats-player-tabs">' +
-      session.names.map((name, i) => `<button class="stats-tab${i === statsActivePlayer ? ' active' : ''}" onclick="selectStatsPlayer(${i})">${escHtml(name)}</button>`).join('') +
+      session.names.map((name, i) => `<button type="button" class="stats-tab${i === statsActivePlayer ? ' active' : ''}" onclick="selectStatsPlayer(${i})">${escHtml(name)}</button>`).join('') +
       '</div>'
     : '';
   document.getElementById('stats-content').innerHTML = tabsHtml + playerTabsHtml + '<div id="stats-data-content"></div>';
@@ -1454,4 +1452,4 @@ function shakeCurrent() {
 }
 
 // ── START ─────────────────────────────────────────────────
-showMenu();can 
+showMenu();
